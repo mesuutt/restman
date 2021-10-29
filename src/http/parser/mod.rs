@@ -1,10 +1,11 @@
-mod test;
-
 use nom::bytes::complete::take_while;
-use nom::character::complete::{crlf, one_of, char};
-use nom::character::is_alphanumeric;
-use nom::IResult;
 use nom::bytes::streaming::tag;
+use nom::character::{is_alphanumeric, is_space};
+use nom::character::complete::{char, crlf, one_of};
+use nom::IResult;
+use nom::sequence::tuple;
+
+mod test;
 
 #[derive(PartialEq, Debug)]
 pub struct RequestLine<'a> {
@@ -17,6 +18,12 @@ pub struct RequestLine<'a> {
 pub enum Version {
     V10,
     V11,
+}
+
+#[derive(PartialEq, Debug)]
+pub struct Header<'a> {
+    pub name: &'a [u8],
+    pub value: &'a [u8],
 }
 
 
@@ -35,7 +42,7 @@ fn request_line(i: &[u8]) -> IResult<&[u8], RequestLine> {
     }))
 }
 
-fn http_version(i:&[u8]) -> IResult<&[u8], Version> {
+fn http_version(i: &[u8]) -> IResult<&[u8], Version> {
     let (i, _) = tag("HTTP/1.")(i)?;
     let (i, minor) = one_of("01")(i)?;
 
@@ -43,6 +50,16 @@ fn http_version(i:&[u8]) -> IResult<&[u8], Version> {
         Version::V10
     } else {
         Version::V11
+    }))
+}
+
+fn header_line(i: &[u8]) -> IResult<&[u8], Header> {
+    let (i, (name, _, _, value, _)) =
+        tuple((token, tag(":"), take_while(is_space), take_while(is_header_value_char), crlf))(i)?;
+
+    Ok((i, Header {
+        name,
+        value,
     }))
 }
 
@@ -64,7 +81,13 @@ fn vchar_1(i: &[u8]) -> IResult<&[u8], &[u8]> {
     take_while(is_vchar)(i)
 }
 
-fn sp(i:&[u8]) -> IResult<&[u8], char> {
+fn sp(i: &[u8]) -> IResult<&[u8], char> {
     char(' ')(i)
 }
+
+
+fn is_header_value_char(i: u8) -> bool {
+    i == 9 || (i >= 32 && i <= 126)
+}
+
 
