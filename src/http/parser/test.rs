@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test {
     use crate::http::parser::{
-        header_line, request, request_line, Header, MessageBody, Method, Request, RequestLine,
-        Version,
+        header_line, parse_request, request_line, Header, MessageBody, Method, Request,
+        RequestLine, Version,
     };
     use nom_locate::LocatedSpan;
 
@@ -59,7 +59,7 @@ mod test {
         {\"foo\": \"bar\"}\r\n",
         );
 
-        let result = request(input).unwrap();
+        let result = parse_request(input).unwrap();
 
         let expected = Request {
             method: Method::Get,
@@ -102,10 +102,10 @@ mod test {
         assert_eq!(&b"foo=bar"[..], u);
     }*/
 
-    /*#[test]
+    #[test]
     fn request_without_body() {
-        let input = LocatedSpan::new("GET /index.html HTTP/1.1\r\n\r\n");
-        let result = request(input).unwrap();
+        let input = LocatedSpan::new("GET /index.html\r\n\r\n");
+        let result = parse_request(input).unwrap();
 
         let expected = Request {
             method: Method::Get,
@@ -118,5 +118,5 @@ mod test {
         assert_eq!(result.method, expected.method);
         assert_eq!(result.path, expected.path);
         assert_eq!(result.body, expected.body);
-    }*/
+    }
 }

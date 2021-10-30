@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_while};
 use nom::character::complete::{char, crlf, one_of};
 use nom::character::is_alphanumeric;
@@ -149,15 +150,15 @@ fn parse_headers(i: Span) -> IResult<Vec<Header>> {
     Ok((i, headers))
 }
 
-fn request_body(i: Span) -> IResult<MessageBody> {
+fn parse_request_body(i: Span) -> IResult<MessageBody> {
     // let (i, body) = block_parser(i, Span::new(CRLF), Span::new(CRLF))?;
-    let (i, body) = delimited(tag(CRLF), is_not(CRLF), tag(CRLF))(i)?;
+    let (i, body) = opt(delimited(tag(CRLF), is_not(CRLF), tag(CRLF)))(i)?;
 
-    if body.fragment() == &"" {
+    if body.is_none() {
         return Ok((i, MessageBody::Empty));
     }
 
-    Ok((i, MessageBody::Bytes(body)))
+    Ok((i, MessageBody::Bytes(body.unwrap())))
 }
 
 /*
@@ -166,12 +167,12 @@ fn block_parser(i: Span, start: Span, end: Span) -> IResult<Span> {
 }
 */
 
-pub fn request(i: Span) -> ParseResult<Request> {
+pub fn parse_request(i: Span) -> ParseResult<Request> {
     let (i, line) = request_line(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling
     let (i, headers) = parse_headers(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling;
                                                                               //.map_or((i, None), |(x,y)| (i, if y.is_empty() { None } else {Some(y)}));//.map_err(|_| ParseError::ParseError)?; // FIXME:
 
-    let (_i, body) = request_body(i).map_err(|_x| ParseError::ParseError)?; // FIXME: fix error handling // .map_or((i, None), |(x,y)| (i, Some(y)));
+    let (_i, body) = parse_request_body(i).map_err(|_x| ParseError::ParseError)?; // FIXME: fix error handling // .map_or((i, None), |(x,y)| (i, Some(y)));
 
     Ok(Request {
         method: Method::from(line.method),
