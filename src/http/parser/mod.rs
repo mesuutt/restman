@@ -1,19 +1,22 @@
 use std::path::PathBuf;
 
-use nom::bytes::complete::{is_not, take_while};
-use nom::bytes::streaming::tag;
+use nom::bytes::complete::{is_not, tag, take_while};
 use nom::character::complete::{char, crlf, one_of};
-use nom::character::{is_alphanumeric, is_space};
+use nom::character::is_alphanumeric;
 use nom::combinator::opt;
 use nom::multi::many0;
 use nom::sequence::{delimited, tuple};
-use nom::IResult;
+use nom_locate::LocatedSpan;
 
 mod test;
 
+pub type Span<'a> = LocatedSpan<&'a str>;
+
+pub type IResult<'a, O> = nom::IResult<Span<'a>, O>;
+
 pub type ParseResult<'a, T> = Result<T, ParseError<'a>>;
 
-const CRLF: &[u8] = b"\r\n";
+const CRLF: &str = "\r\n";
 
 #[derive(Debug)]
 pub enum ParseError<'a> {
@@ -23,8 +26,8 @@ pub enum ParseError<'a> {
 
 #[derive(PartialEq, Debug)]
 pub struct RequestLine<'a> {
-    pub method: &'a [u8],
-    pub path: &'a [u8],
+    pub method: Span<'a>,
+    pub path: Span<'a>,
     pub version: Version,
 }
 
@@ -50,14 +53,14 @@ pub enum Method {
 
 #[derive(PartialEq, Debug)]
 pub enum MessageBody<'a> {
-    Bytes(&'a [u8]),
+    Bytes(Span<'a>),
     File(PathBuf),
     Empty,
 }
 
-impl From<&[u8]> for Method {
-    fn from(i: &[u8]) -> Self {
-        match i {
+impl From<Span<'_>> for Method {
+    fn from(i: Span) -> Self {
+        match i.fragment().as_bytes() {
             b"GET" => Method::Get,
             b"POST" => Method::Post,
             b"HEAD" => Method::Head,
@@ -75,13 +78,25 @@ pub enum Version {
     V11,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 pub struct Header<'a> {
-    pub name: &'a [u8],
-    pub value: &'a [u8],
+    pub name: Span<'a>,
+    pub value: Span<'a>,
 }
 
-fn request_line(i: &[u8]) -> IResult<&[u8], RequestLine> {
+impl<'a> PartialEq for Header<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.name.fragment() == other.name.fragment()
+            && self.value.fragment() == other.value.fragment()
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        self.name.fragment() != other.name.fragment()
+            || self.value.fragment() != other.value.fragment()
+    }
+}
+
+fn request_line(i: Span) -> IResult<RequestLine> {
     let (i, method) = token(i)?;
     let (i, _) = sp(i)?;
     let (i, path) = vchar_1(i)?; // TODO: handle all valid urls, read rfc
@@ -99,7 +114,7 @@ fn request_line(i: &[u8]) -> IResult<&[u8], RequestLine> {
     ))
 }
 
-fn http_version(i: &[u8]) -> IResult<&[u8], Version> {
+fn http_version(i: Span) -> IResult<Version> {
     let (i, t) = opt(tag("HTTP/1."))(i)?;
     if t.is_none() {
         return Ok((i, Version::V11));
@@ -117,7 +132,7 @@ fn http_version(i: &[u8]) -> IResult<&[u8], Version> {
     ))
 }
 
-fn header_line(i: &[u8]) -> IResult<&[u8], Header> {
+fn header_line(i: Span) -> IResult<Header> {
     let (i, (name, _, _, value, _)) = tuple((
         token,
         tag(":"),
@@ -129,36 +144,38 @@ fn header_line(i: &[u8]) -> IResult<&[u8], Header> {
     Ok((i, Header { name, value }))
 }
 
-fn parse_headers(i: &[u8]) -> IResult<&[u8], Vec<Header>> {
+fn parse_headers(i: Span) -> IResult<Vec<Header>> {
     let (i, headers) = many0(header_line)(i)?;
     Ok((i, headers))
 }
 
-fn request_body(i: &[u8]) -> IResult<&[u8], MessageBody> {
-    let (i, body) = block_parser(i, CRLF, CRLF)?;
+fn request_body(i: Span) -> IResult<MessageBody> {
+    // let (i, body) = block_parser(i, Span::new(CRLF), Span::new(CRLF))?;
+    let (i, body) = delimited(tag(CRLF), is_not(CRLF), tag(CRLF))(i)?;
 
-    if body == b"" {
+    if body.fragment() == &"" {
         return Ok((i, MessageBody::Empty));
     }
 
     Ok((i, MessageBody::Bytes(body)))
 }
 
-fn block_parser<'a>(i: &'a [u8], start: &'a [u8], end: &'a [u8]) -> IResult<&'a [u8], &'a [u8]> {
+/*
+fn block_parser(i: Span, start: Span, end: Span) -> IResult<Span> {
     delimited(tag(start), is_not(end), tag(end))(i)
 }
+*/
 
-fn request(i: &[u8]) -> ParseResult<Request> {
+fn request(i: Span) -> ParseResult<Request> {
     let (i, line) = request_line(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling
     let (i, headers) = parse_headers(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling;
                                                                               //.map_or((i, None), |(x,y)| (i, if y.is_empty() { None } else {Some(y)}));//.map_err(|_| ParseError::ParseError)?; // FIXME:
-    let path = std::str::from_utf8(line.path).map_err(|_x| ParseError::InvalidPath(line.path))?;
 
     let (_i, body) = request_body(i).map_err(|_x| ParseError::ParseError)?; // FIXME: fix error handling // .map_or((i, None), |(x,y)| (i, Some(y)));
 
     Ok(Request {
         method: Method::from(line.method),
-        path: path.to_string(),
+        path: line.path.fragment().to_string(),
         version: line.version,
         headers,
         body,
@@ -169,26 +186,38 @@ fn print(label: &str, i: &[u8]) {
     println!("{}: {:?}", label, std::str::from_utf8(i));
 }
 
-fn is_token_char(i: u8) -> bool {
-    is_alphanumeric(i) || b"!#$%&'*+-.^_`|~".contains(&i)
+fn is_token_char(i: char) -> bool {
+    is_alphanumeric(i as u8) || "!#$%&'*+-.^_`|~".contains(i)
 }
 
-fn token(i: &[u8]) -> IResult<&[u8], &[u8]> {
+fn token(i: Span) -> IResult<Span> {
     take_while(is_token_char)(i)
 }
 
-fn is_vchar(i: u8) -> bool {
-    i > 32 && i <= 126
+fn is_vchar(i: char) -> bool {
+    // c.is_alphabetic()
+    i as u32 > 32 && i as u32 <= 126
 }
 
-fn vchar_1(i: &[u8]) -> IResult<&[u8], &[u8]> {
+fn vchar_1(i: Span) -> IResult<Span> {
     take_while(is_vchar)(i)
 }
 
-fn sp(i: &[u8]) -> IResult<&[u8], char> {
+fn is_space(x: char) -> bool {
+    x == ' '
+}
+
+fn sp(i: Span) -> IResult<char> {
     char(' ')(i)
 }
 
-fn is_header_value_char(i: u8) -> bool {
+fn is_header_value_char(i: char) -> bool {
+    /*let i = match i.to_digit(10) {
+        None => return false,
+        Some(x) => x,
+    };
+    */
+    let i = i as u32;
+
     i == 9 || (i >= 32 && i <= 126)
 }
