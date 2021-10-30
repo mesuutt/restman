@@ -166,7 +166,7 @@ fn block_parser(i: Span, start: Span, end: Span) -> IResult<Span> {
 }
 */
 
-fn request(i: Span) -> ParseResult<Request> {
+pub fn request(i: Span) -> ParseResult<Request> {
     let (i, line) = request_line(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling
     let (i, headers) = parse_headers(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling;
                                                                               //.map_or((i, None), |(x,y)| (i, if y.is_empty() { None } else {Some(y)}));//.map_err(|_| ParseError::ParseError)?; // FIXME:
