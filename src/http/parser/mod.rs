@@ -1,16 +1,13 @@
-use std::convert::TryFrom;
 use std::path::PathBuf;
 
 use nom::bytes::complete::{is_not, take_while};
 use nom::bytes::streaming::tag;
-use nom::character::{is_alphanumeric, is_space, is_alphabetic};
-use nom::character::complete::{char, crlf, newline, one_of, space0};
+use nom::character::complete::{char, crlf, one_of};
+use nom::character::{is_alphanumeric, is_space};
+use nom::combinator::opt;
+use nom::multi::many0;
+use nom::sequence::{delimited, tuple};
 use nom::IResult;
-use nom::multi::{separated_list0, many1, many0};
-use nom::sequence::{delimited, terminated, tuple};
-use nom::combinator::{peek, not, opt};
-use nom::branch::alt;
-use nom::error::dbg_dmp;
 
 mod test;
 
@@ -23,7 +20,6 @@ pub enum ParseError<'a> {
     InvalidPath(&'a [u8]),
     ParseError,
 }
-
 
 #[derive(PartialEq, Debug)]
 pub struct RequestLine<'a> {
@@ -68,9 +64,7 @@ impl From<&[u8]> for Method {
             b"OPTIONS" => Method::Options,
             b"PUT" => Method::Put,
             b"DELETE" => Method::Delete,
-            x => {
-                Method::Custom(String::from_utf8_lossy(x).to_string())
-            }
+            x => Method::Custom(String::from_utf8_lossy(x).to_string()),
         }
     }
 }
@@ -87,7 +81,6 @@ pub struct Header<'a> {
     pub value: &'a [u8],
 }
 
-
 fn request_line(i: &[u8]) -> IResult<&[u8], RequestLine> {
     let (i, method) = token(i)?;
     let (i, _) = sp(i)?;
@@ -96,41 +89,48 @@ fn request_line(i: &[u8]) -> IResult<&[u8], RequestLine> {
     let (i, version) = http_version(i)?;
     let (i, _) = crlf(i)?;
 
-    Ok((i, RequestLine {
-        method,
-        version,
-        path,
-    }))
+    Ok((
+        i,
+        RequestLine {
+            method,
+            version,
+            path,
+        },
+    ))
 }
 
 fn http_version(i: &[u8]) -> IResult<&[u8], Version> {
     let (i, t) = opt(tag("HTTP/1."))(i)?;
     if t.is_none() {
-        return Ok((i, Version::V11))
+        return Ok((i, Version::V11));
     }
 
     let (i, minor) = one_of("01")(i)?;
 
-    Ok((i, if minor == '0' {
-        Version::V10
-    } else {
-        Version::V11
-    }))
+    Ok((
+        i,
+        if minor == '0' {
+            Version::V10
+        } else {
+            Version::V11
+        },
+    ))
 }
 
 fn header_line(i: &[u8]) -> IResult<&[u8], Header> {
-    let (i, (name, _, _, value, _)) =
-        tuple((token, tag(":"), take_while(is_space), take_while(is_header_value_char), crlf))(i)?;
+    let (i, (name, _, _, value, _)) = tuple((
+        token,
+        tag(":"),
+        take_while(is_space),
+        take_while(is_header_value_char),
+        crlf,
+    ))(i)?;
 
-    Ok((i, Header {
-        name,
-        value,
-    }))
+    Ok((i, Header { name, value }))
 }
 
 fn parse_headers(i: &[u8]) -> IResult<&[u8], Vec<Header>> {
-    let (i, headers) =
-        many0(header_line)(i)?;
+    let (i, headers) = many0(header_line)(i)?;
     Ok((i, headers))
 }
 
@@ -138,12 +138,11 @@ fn request_body(i: &[u8]) -> IResult<&[u8], MessageBody> {
     let (i, body) = block_parser(i, CRLF, CRLF)?;
 
     if body == b"" {
-        return Ok((i, MessageBody::Empty))
+        return Ok((i, MessageBody::Empty));
     }
 
     Ok((i, MessageBody::Bytes(body)))
 }
-
 
 fn block_parser<'a>(i: &'a [u8], start: &'a [u8], end: &'a [u8]) -> IResult<&'a [u8], &'a [u8]> {
     delimited(tag(start), is_not(end), tag(end))(i)
@@ -152,18 +151,18 @@ fn block_parser<'a>(i: &'a [u8], start: &'a [u8], end: &'a [u8]) -> IResult<&'a 
 fn request(i: &[u8]) -> ParseResult<Request> {
     let (i, line) = request_line(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling
     let (i, headers) = parse_headers(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling;
-        //.map_or((i, None), |(x,y)| (i, if y.is_empty() { None } else {Some(y)}));//.map_err(|_| ParseError::ParseError)?; // FIXME:
-    let path = std::str::from_utf8(line.path).map_err(|x| ParseError::InvalidPath(line.path))?;
+                                                                              //.map_or((i, None), |(x,y)| (i, if y.is_empty() { None } else {Some(y)}));//.map_err(|_| ParseError::ParseError)?; // FIXME:
+    let path = std::str::from_utf8(line.path).map_err(|_x| ParseError::InvalidPath(line.path))?;
 
-    let (i, body) = request_body(i).map_err(|x| ParseError::ParseError)?; // FIXME: fix error handling // .map_or((i, None), |(x,y)| (i, Some(y)));
+    let (_i, body) = request_body(i).map_err(|_x| ParseError::ParseError)?; // FIXME: fix error handling // .map_or((i, None), |(x,y)| (i, Some(y)));
 
-    Ok((Request {
+    Ok(Request {
         method: Method::from(line.method),
         path: path.to_string(),
         version: line.version,
         headers,
         body,
-    }))
+    })
 }
 
 fn print(label: &str, i: &[u8]) {
@@ -171,8 +170,7 @@ fn print(label: &str, i: &[u8]) {
 }
 
 fn is_token_char(i: u8) -> bool {
-    is_alphanumeric(i) ||
-        b"!#$%&'*+-.^_`|~".contains(&i)
+    is_alphanumeric(i) || b"!#$%&'*+-.^_`|~".contains(&i)
 }
 
 fn token(i: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -194,4 +192,3 @@ fn sp(i: &[u8]) -> IResult<&[u8], char> {
 fn is_header_value_char(i: u8) -> bool {
     i == 9 || (i >= 32 && i <= 126)
 }
-

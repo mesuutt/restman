@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod test {
-    use crate::http::parser::{block_parser, Header, header_line, MessageBody, Method, Request, request, request_body, request_line, RequestLine, Version};
+    use crate::http::parser::{
+        block_parser, header_line, request, request_line, Header, MessageBody, Method, Request,
+        RequestLine, Version,
+    };
 
     #[test]
     fn request_line_test() {
@@ -51,7 +54,16 @@ mod test {
             method: Method::Get,
             path: "/index.html".to_string(),
             version: Version::V11,
-            headers: vec![Header { name: b"Content-type", value: b"application/json" }, Header { name: b"Authorization", value: b"bearer token" }],
+            headers: vec![
+                Header {
+                    name: b"Content-type",
+                    value: b"application/json",
+                },
+                Header {
+                    name: b"Authorization",
+                    value: b"bearer token",
+                },
+            ],
             body: MessageBody::Bytes(b"{\"foo\": \"bar\"}"),
         };
 
@@ -61,7 +73,7 @@ mod test {
     #[test]
     fn request_body_parser_test() {
         let input = b"\r\nfoo=bar\r\n";
-        let (i, u) = block_parser(input, b"\r\n", b"\r\n").unwrap();
+        let (_i, u) = block_parser(input, b"\r\n", b"\r\n").unwrap();
 
         assert_eq!(&b"foo=bar"[..], u);
     }
