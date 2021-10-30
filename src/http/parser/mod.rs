@@ -1,17 +1,76 @@
-use nom::bytes::complete::take_while;
+use std::convert::TryFrom;
+use std::path::PathBuf;
+
+use nom::bytes::complete::{is_not, take_while};
 use nom::bytes::streaming::tag;
 use nom::character::{is_alphanumeric, is_space};
-use nom::character::complete::{char, crlf, one_of};
+use nom::character::complete::{char, crlf, newline, one_of, space0};
 use nom::IResult;
-use nom::sequence::tuple;
+use nom::multi::{separated_list0, many1, many0};
+use nom::sequence::{delimited, terminated, tuple};
+use nom::combinator::{peek, not, opt};
+use nom::branch::alt;
+use nom::error::dbg_dmp;
 
 mod test;
+
+pub type ParseResult<'a, T> = Result<T, ParseError<'a>>;
+
+#[derive(Debug)]
+pub enum ParseError<'a> {
+    InvalidPath(&'a [u8]),
+    ParseError,
+}
+
 
 #[derive(PartialEq, Debug)]
 pub struct RequestLine<'a> {
     pub method: &'a [u8],
     pub path: &'a [u8],
     pub version: Version,
+}
+
+#[derive(PartialEq, Debug)]
+pub struct Request<'a> {
+    method: Method,
+    path: String,
+    version: Version,
+    headers: Vec<Header<'a>>,
+    body: MessageBody<'a>,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum Method {
+    Get,
+    Post,
+    Head,
+    Options,
+    Put,
+    Delete,
+    Custom(String),
+}
+
+#[derive(PartialEq, Debug)]
+pub enum MessageBody<'a> {
+    Bytes(&'a [u8]),
+    File(PathBuf),
+    Empty,
+}
+
+impl From<&[u8]> for Method {
+    fn from(i: &[u8]) -> Self {
+        match i {
+            b"GET" => Method::Get,
+            b"POST" => Method::Post,
+            b"HEAD" => Method::Head,
+            b"OPTIONS" => Method::Options,
+            b"PUT" => Method::Put,
+            b"DELETE" => Method::Delete,
+            x => {
+                Method::Custom(String::from_utf8_lossy(x).to_string())
+            }
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -63,6 +122,55 @@ fn header_line(i: &[u8]) -> IResult<&[u8], Header> {
     }))
 }
 
+fn parse_headers(i: &[u8]) -> IResult<&[u8], Vec<Header>> {
+    let (i, headers) =
+        many0(header_line)(i)?;
+    Ok((i, headers))
+}
+
+fn request_body(i: &[u8]) -> IResult<&[u8], MessageBody> {
+    // let (i, body) = delimited(tag("\r\n"), is_not("\r\n"), tag("\r\n"))(i)?;
+    // print("body", body);
+    let (i, body) = block_parser(i, b"\r\n", b"\r\n")?;
+
+    if body == b"" {
+        return Ok((i, MessageBody::Empty))
+    }
+
+    Ok((i, MessageBody::Bytes(body)))
+}
+
+
+fn block_parser<'a>(i: &'a [u8], start: &'a [u8], end: &'a [u8]) -> IResult<&'a [u8], &'a [u8]> {
+    delimited(tag(start), is_not(end), tag(end))(i)
+}
+
+fn request(i: &[u8]) -> ParseResult<Request> {
+    let (i, line) = request_line(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling
+    let (i, headers) = parse_headers(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling;
+        //.map_or((i, None), |(x,y)| (i, if y.is_empty() { None } else {Some(y)}));//.map_err(|_| ParseError::ParseError)?; // FIXME:
+    let path = std::str::from_utf8(line.path).map_err(|x| ParseError::InvalidPath(line.path))?;
+
+    print("body before", i);
+    // let (pi, _) = peek(token)(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling;
+    // print("pii after", pi);
+
+    let (i, body) = request_body(i).map_err(|x| ParseError::ParseError)?; // FIXME: fix error handling // .map_or((i, None), |(x,y)| (i, Some(y)));
+    print("body after", i);
+    // print("extracted body", body);
+
+    Ok((Request {
+        method: Method::from(line.method),
+        path: path.to_string(),
+        version: line.version,
+        headers,
+        body,
+    }))
+}
+
+fn print(label: &str, i: &[u8]) {
+    println!("{}: {:?}", label, std::str::from_utf8(i));
+}
 
 fn is_token_char(i: u8) -> bool {
     is_alphanumeric(i) ||
@@ -85,9 +193,7 @@ fn sp(i: &[u8]) -> IResult<&[u8], char> {
     char(' ')(i)
 }
 
-
 fn is_header_value_char(i: u8) -> bool {
     i == 9 || (i >= 32 && i <= 126)
 }
-
 
