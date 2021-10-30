@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use nom::branch::alt;
+
 use nom::bytes::complete::{is_not, tag, take_while};
 use nom::character::complete::{char, crlf, one_of};
 use nom::character::is_alphanumeric;
@@ -8,22 +8,56 @@ use nom::combinator::opt;
 use nom::multi::many0;
 use nom::sequence::{delimited, tuple};
 use nom_locate::LocatedSpan;
+use nom::Err::{Failure};
 
 mod test;
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 
-pub type IResult<'a, O> = nom::IResult<Span<'a>, O>;
-
-pub type ParseResult<'a, T> = Result<T, ParseError<'a>>;
+pub type IResult<'a, O> = nom::IResult<Span<'a>, O, ParseErr<'a>>;
 
 const CRLF: &str = "\r\n";
 
-#[derive(Debug)]
-pub enum ParseError<'a> {
-    InvalidPath(&'a [u8]),
-    ParseError,
+#[derive(Debug, PartialEq)]
+pub struct ParseErr<'a> {
+    span: Span<'a>,
+    message: Option<String>,
 }
+
+impl<'a> ParseErr<'a> {
+    pub fn new(message: String, span: Span<'a>) -> Self {
+        Self { span, message: Some(message) }
+    }
+
+    pub fn span(&self) -> &Span { &self.span }
+
+    pub fn line(&self) -> u32 { self.span().location_line() }
+
+    pub fn offset(&self) -> usize { self.span().location_offset() }
+
+}
+
+
+impl<'a> nom::error::ParseError<Span<'a>> for ParseErr<'a> {
+    fn from_error_kind(input: Span<'a>, kind: nom::error::ErrorKind) -> Self {
+        Self::new(format!("parse error {:?}", kind), input)
+    }
+
+    fn append(_input: Span<'a>, _kind: nom::error::ErrorKind, other: Self) -> Self {
+        other
+    }
+
+    fn from_char(input: Span<'a>, c: char) -> Self {
+        Self::new(format!("unexpected character '{}'", c), input)
+    }
+
+    fn or(self, other: Self) -> Self {
+        let message = format!("{}\tOR\n{}\n", self.message.unwrap_or("".to_string()), other.message.unwrap_or("".to_string()));
+        Self::new(message, other.span)
+    }
+
+}
+
 
 #[derive(PartialEq, Debug)]
 pub struct RequestLine<'a> {
@@ -55,7 +89,6 @@ pub enum Method {
 #[derive(PartialEq, Debug)]
 pub enum MessageBody<'a> {
     Bytes(Span<'a>),
-    File(PathBuf),
     Empty,
 }
 
@@ -151,7 +184,6 @@ fn parse_headers(i: Span) -> IResult<Vec<Header>> {
 }
 
 fn parse_request_body(i: Span) -> IResult<MessageBody> {
-    // let (i, body) = block_parser(i, Span::new(CRLF), Span::new(CRLF))?;
     let (i, body) = opt(delimited(tag(CRLF), is_not(CRLF), tag(CRLF)))(i)?;
 
     if body.is_none() {
@@ -161,26 +193,26 @@ fn parse_request_body(i: Span) -> IResult<MessageBody> {
     Ok((i, MessageBody::Bytes(body.unwrap())))
 }
 
-/*
-fn block_parser(i: Span, start: Span, end: Span) -> IResult<Span> {
-    delimited(tag(start), is_not(end), tag(end))(i)
-}
-*/
+pub fn parse_request(i: Span) -> IResult<Request> {
+    let (i, line) = request_line(i).map_err(|_| {
+        Failure(ParseErr::new("request line parse failed".to_string(), i))
+    })?;
 
-pub fn parse_request(i: Span) -> ParseResult<Request> {
-    let (i, line) = request_line(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling
-    let (i, headers) = parse_headers(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling;
-                                                                              //.map_or((i, None), |(x,y)| (i, if y.is_empty() { None } else {Some(y)}));//.map_err(|_| ParseError::ParseError)?; // FIXME:
+    let (i, headers) = parse_headers(i).map_err(|_| {
+        Failure(ParseErr::new("request headers cannot parsed".to_string(), i))
+    })?;
 
-    let (_i, body) = parse_request_body(i).map_err(|_x| ParseError::ParseError)?; // FIXME: fix error handling // .map_or((i, None), |(x,y)| (i, Some(y)));
+    let (i, body) = parse_request_body(i).map_err(|_| {
+        Failure(ParseErr::new("request body parse failed".to_string(), i))
+    })?;
 
-    Ok(Request {
+    Ok((i, Request {
         method: Method::from(line.method),
         path: line.path.fragment().to_string(),
         version: line.version,
         headers,
         body,
-    })
+    }))
 }
 
 fn print(label: &str, i: &[u8]) {

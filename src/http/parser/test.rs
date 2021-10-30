@@ -59,7 +59,7 @@ mod test {
         {\"foo\": \"bar\"}\r\n",
         );
 
-        let result = parse_request(input).unwrap();
+        let (_span, result) = parse_request(input).unwrap();
 
         let expected = Request {
             method: Method::Get,
@@ -105,7 +105,7 @@ mod test {
     #[test]
     fn request_without_body() {
         let input = LocatedSpan::new("GET /index.html\r\n\r\n");
-        let result = parse_request(input).unwrap();
+        let (_, result) = parse_request(input).unwrap();
 
         let expected = Request {
             method: Method::Get,
