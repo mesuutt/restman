@@ -148,7 +148,7 @@ fn block_parser<'a>(i: &'a [u8], start: &'a [u8], end: &'a [u8]) -> IResult<&'a 
     delimited(tag(start), is_not(end), tag(end))(i)
 }
 
-fn request(i: &[u8]) -> ParseResult<Request> {
+pub fn request(i: &[u8]) -> ParseResult<Request> {
     let (i, line) = request_line(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling
     let (i, headers) = parse_headers(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling;
                                                                               //.map_or((i, None), |(x,y)| (i, if y.is_empty() { None } else {Some(y)}));//.map_err(|_| ParseError::ParseError)?; // FIXME:
