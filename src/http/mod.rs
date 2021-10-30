@@ -1,1 +1,3 @@
-pub mod parser;
+mod parser;
+
+pub use parser::parse_request;
