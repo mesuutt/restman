@@ -16,6 +16,19 @@ mod test {
     }
 
     #[test]
+    fn request_line_without_http_version() {
+        let input = b"GET /index.html\r\n";
+        let result = request_line(input);
+        let expected = RequestLine {
+            method: b"GET",
+            path: b"/index.html",
+            version: Version::V11,
+        };
+
+        assert_eq!(result, Ok((&[][..], expected)));
+    }
+
+    #[test]
     fn header_parser_test() {
         let input = b"Content-type: application/json\r\n";
 
@@ -53,9 +66,6 @@ mod test {
     #[test]
     fn request_body_parser_test() {
         let input = b"\r\n{\"foo\": \"bar\"}\r\n";
-        //let input = b"\r\n{\"foo\": \"bar\"}\r\n";
-
-        // let result = request_body(input).unwrap();
         let (i, u) = block_parser(input, b"\r\n", b"\r\n").unwrap();
         println!("{:?}", std::str::from_utf8(u));
     }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use nom::bytes::complete::{is_not, take_while};
 use nom::bytes::streaming::tag;
-use nom::character::{is_alphanumeric, is_space};
+use nom::character::{is_alphanumeric, is_space, is_alphabetic};
 use nom::character::complete::{char, crlf, newline, one_of, space0};
 use nom::IResult;
 use nom::multi::{separated_list0, many1, many0};
@@ -15,6 +15,8 @@ use nom::error::dbg_dmp;
 mod test;
 
 pub type ParseResult<'a, T> = Result<T, ParseError<'a>>;
+
+const CRLF: &[u8] = b"\r\n";
 
 #[derive(Debug)]
 pub enum ParseError<'a> {
@@ -90,7 +92,7 @@ fn request_line(i: &[u8]) -> IResult<&[u8], RequestLine> {
     let (i, method) = token(i)?;
     let (i, _) = sp(i)?;
     let (i, path) = vchar_1(i)?; // TODO: handle all valid urls, read rfc
-    let (i, _) = sp(i)?;
+    let (i, _) = take_while(is_space)(i)?;
     let (i, version) = http_version(i)?;
     let (i, _) = crlf(i)?;
 
@@ -102,7 +104,11 @@ fn request_line(i: &[u8]) -> IResult<&[u8], RequestLine> {
 }
 
 fn http_version(i: &[u8]) -> IResult<&[u8], Version> {
-    let (i, _) = tag("HTTP/1.")(i)?;
+    let (i, t) = opt(tag("HTTP/1."))(i)?;
+    if t.is_none() {
+        return Ok((i, Version::V11))
+    }
+
     let (i, minor) = one_of("01")(i)?;
 
     Ok((i, if minor == '0' {
@@ -129,9 +135,7 @@ fn parse_headers(i: &[u8]) -> IResult<&[u8], Vec<Header>> {
 }
 
 fn request_body(i: &[u8]) -> IResult<&[u8], MessageBody> {
-    // let (i, body) = delimited(tag("\r\n"), is_not("\r\n"), tag("\r\n"))(i)?;
-    // print("body", body);
-    let (i, body) = block_parser(i, b"\r\n", b"\r\n")?;
+    let (i, body) = block_parser(i, CRLF, CRLF)?;
 
     if body == b"" {
         return Ok((i, MessageBody::Empty))
@@ -151,13 +155,7 @@ fn request(i: &[u8]) -> ParseResult<Request> {
         //.map_or((i, None), |(x,y)| (i, if y.is_empty() { None } else {Some(y)}));//.map_err(|_| ParseError::ParseError)?; // FIXME:
     let path = std::str::from_utf8(line.path).map_err(|x| ParseError::InvalidPath(line.path))?;
 
-    print("body before", i);
-    // let (pi, _) = peek(token)(i).map_err(|_| ParseError::ParseError)?; // FIXME: fix error handling;
-    // print("pii after", pi);
-
     let (i, body) = request_body(i).map_err(|x| ParseError::ParseError)?; // FIXME: fix error handling // .map_or((i, None), |(x,y)| (i, Some(y)));
-    print("body after", i);
-    // print("extracted body", body);
 
     Ok((Request {
         method: Method::from(line.method),
