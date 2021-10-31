@@ -1,9 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::http::parser::{
-        header_line, parse_request, request_line, Header, MessageBody, Method, Request,
-        RequestLine, Version,
-    };
+    use crate::http::parser::{header_line, parse_request, request_line, Header, MessageBody, Method, Request, RequestLine, Version, parse_headers};
     use nom_locate::LocatedSpan;
 
     #[test]
@@ -22,8 +19,6 @@ mod test {
         assert_eq!(line.method, expected.method);
         assert_eq!(line.version, expected.version);
         assert_eq!(line.path.fragment(), expected.path.fragment());
-
-        // assert_eq!(result, Ok((LocatedSpan::new(""), expected)));
     }
 
     #[test]
@@ -50,6 +45,27 @@ mod test {
     }
 
     #[test]
+    fn multiple_header_parse_test() {
+        let input = LocatedSpan::new("Content-type: application/json\r\nAuthorization: bearer token\r\n");
+
+        let (_span, headers) = parse_headers(input).expect("header parse failed");
+
+        let expected1 = Header {
+            name: LocatedSpan::new("Content-type"),
+            value: LocatedSpan::new("application/json"),
+        };
+
+        let expected2 = Header {
+            name: LocatedSpan::new("Authorization"),
+            value: LocatedSpan::new("bearer token"),
+        };
+
+        assert_eq!(headers.len(), 2);
+        assert_eq!(headers[0], expected1);
+        assert_eq!(headers[1], expected2);
+    }
+
+    #[test]
     fn request_parser_test() {
         let input = LocatedSpan::new(
             "GET /index.html HTTP/1.1\r\n\
@@ -61,30 +77,11 @@ mod test {
 
         let (_span, result) = parse_request(input).unwrap();
 
-        let expected = Request {
-            method: Method::Get,
-            path: "/index.html".to_string(),
-            version: Version::V11,
-            headers: vec![
-                Header {
-                    name: LocatedSpan::new("Content-type"),
-                    value: LocatedSpan::new("application/json"),
-                },
-                Header {
-                    name: LocatedSpan::new("Authorization"),
-                    value: LocatedSpan::new("bearer token"),
-                },
-            ],
-            body: MessageBody::Bytes(LocatedSpan::new("{\"foo\": \"bar\"}")),
-        };
+        assert_eq!(result.method, Method::Get);
+        assert_eq!(result.path, "/index.html".to_string());
+        assert_eq!(result.version,Version::V11);
 
-        assert_eq!(result.method, expected.method);
-        assert_eq!(result.path, expected.path);
-        assert_eq!(result.version, expected.version);
-
-        for (i, h) in result.headers.iter().enumerate() {
-            assert_eq!(h, &expected.headers[i]);
-        }
+        assert_eq!(result.headers.len(), 2);
 
         if let MessageBody::Bytes(span) = result.body {
             assert_eq!(span.fragment(), &"{\"foo\": \"bar\"}");
@@ -93,30 +90,11 @@ mod test {
         }
     }
 
-    /*
     #[test]
-    fn request_body_parser_test() {
-        let input = b"\r\nfoo=bar\r\n";
-        let (_i, u) = block_parser(input, b"\r\n", b"\r\n").unwrap();
-
-        assert_eq!(&b"foo=bar"[..], u);
-    }*/
-
-    #[test]
-    fn request_without_body() {
+    fn request_without_body_test() {
         let input = LocatedSpan::new("GET /index.html\r\n\r\n");
         let (_, result) = parse_request(input).unwrap();
 
-        let expected = Request {
-            method: Method::Get,
-            path: "/index.html".to_string(),
-            version: Version::V11,
-            headers: vec![],
-            body: MessageBody::Empty,
-        };
-
-        assert_eq!(result.method, expected.method);
-        assert_eq!(result.path, expected.path);
-        assert_eq!(result.body, expected.body);
+        assert_eq!(result.body, MessageBody::Empty);
     }
 }
