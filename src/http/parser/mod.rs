@@ -82,6 +82,7 @@ pub enum Method {
     Head,
     Options,
     Put,
+    Patch,
     Delete,
     Custom(String),
 }
@@ -100,6 +101,7 @@ impl From<Span<'_>> for Method {
             b"HEAD" => Method::Head,
             b"OPTIONS" => Method::Options,
             b"PUT" => Method::Put,
+            b"PATCH" => Method::Patch,
             b"DELETE" => Method::Delete,
             x => Method::Custom(String::from_utf8_lossy(x).to_string()),
         }
