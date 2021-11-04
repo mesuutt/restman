@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::http::parser::{header_line, parse_request, request_line, Header, MessageBody, Method, Request, RequestLine, Version, parse_headers};
+    use crate::http::parser::{header_line, parse_request, request_line, Header, MessageBody, Method, Request, RequestLine, Version, parse_headers, parse_multiple_request};
     use nom_locate::LocatedSpan;
 
     #[test]
@@ -48,7 +48,7 @@ mod test {
     fn multiple_header_parse_test() {
         let input = LocatedSpan::new("Content-type: application/json\r\nAuthorization: bearer token\r\n");
 
-        let (_span, headers) = parse_headers(input).expect("header parse failed");
+        let (span, headers) = parse_headers(input).expect("header parse failed");
 
         let expected1 = Header {
             name: LocatedSpan::new("Content-type"),
@@ -60,6 +60,7 @@ mod test {
             value: LocatedSpan::new("bearer token"),
         };
 
+        assert!(span.is_empty());
         assert_eq!(headers.len(), 2);
         assert_eq!(headers[0], expected1);
         assert_eq!(headers[1], expected2);
@@ -68,15 +69,16 @@ mod test {
     #[test]
     fn request_parser_test() {
         let input = LocatedSpan::new(
-            "GET /index.html HTTP/1.1\r\n\
+            "###My request\r\nGET /index.html HTTP/1.1\r\n\
         Content-type: application/json\r\n\
         Authorization: bearer token\r\n\
         \r\n\
         {\"foo\": \"bar\"}\r\n",
         );
 
-        let (_span, result) = parse_request(input).unwrap();
+        let (span, result) = parse_request(input).unwrap();
 
+        assert_eq!(result.title, "My request");
         assert_eq!(result.method, Method::Get);
         assert_eq!(result.path, "/index.html".to_string());
         assert_eq!(result.version,Version::V11);
@@ -96,5 +98,17 @@ mod test {
         let (_, result) = parse_request(input).unwrap();
 
         assert_eq!(result.body, MessageBody::Empty);
+    }
+
+
+    #[test]
+    fn multiple_request_parser_test() {
+        let input = LocatedSpan::new("### Request 1\r\n\
+        GET /first.html\r\n\r\n\
+        ###Request 2\r\n\
+        GET /last.html\r\n\r\n");
+        let (_i, result) = parse_multiple_request(input).unwrap();
+
+        assert_eq!(result.len(), 2);
     }
 }

@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
-
-use nom::bytes::complete::{is_not, tag, take_while};
-use nom::character::complete::{char, crlf, one_of};
-use nom::character::is_alphanumeric;
-use nom::combinator::opt;
-use nom::multi::many0;
+use nom::bytes::complete::{is_not, tag, take_until, take_while};
+use nom::character::complete::{char, crlf, one_of, line_ending, newline};
+use nom::character::{is_alphanumeric, is_newline};
+use nom::combinator::{eof, opt, peek};
+use nom::Err::Failure;
+use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, tuple};
 use nom_locate::LocatedSpan;
-use nom::Err::{Failure};
+use nom::branch::alt;
 
 mod test;
 
@@ -34,7 +34,6 @@ impl<'a> ParseErr<'a> {
     pub fn line(&self) -> u32 { self.span().location_line() }
 
     pub fn offset(&self) -> usize { self.span().location_offset() }
-
 }
 
 
@@ -55,7 +54,6 @@ impl<'a> nom::error::ParseError<Span<'a>> for ParseErr<'a> {
         let message = format!("{}\tOR\n{}\n", self.message.unwrap_or("".to_string()), other.message.unwrap_or("".to_string()));
         Self::new(message, other.span)
     }
-
 }
 
 
@@ -73,6 +71,7 @@ pub struct Request<'a> {
     version: Version,
     headers: Vec<Header<'a>>,
     body: MessageBody<'a>,
+    title: String,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -182,6 +181,7 @@ fn header_line(i: Span) -> IResult<Header> {
 
 fn parse_headers(i: Span) -> IResult<Vec<Header>> {
     let (i, headers) = many0(header_line)(i)?;
+    let (i, _) = opt(line_ending)(i)?;
     Ok((i, headers))
 }
 
@@ -196,6 +196,8 @@ fn parse_request_body(i: Span) -> IResult<MessageBody> {
 }
 
 pub fn parse_request(i: Span) -> IResult<Request> {
+    let (i, title) = parse_optional_title_line(i)?;
+
     let (i, line) = request_line(i).map_err(|_| {
         Failure(ParseErr::new("request line parse failed".to_string(), i))
     })?;
@@ -204,18 +206,68 @@ pub fn parse_request(i: Span) -> IResult<Request> {
         Failure(ParseErr::new("request headers cannot parsed".to_string(), i))
     })?;
 
-    let (i, body) = parse_request_body(i).map_err(|_| {
-        Failure(ParseErr::new("request body parse failed".to_string(), i))
-    })?;
+    let mut  body =  MessageBody::Empty;
+
+    if !peek(parse_optional_title_line)(i).is_ok() && !peek(empty_lines)(i).is_ok() {
+        let (i, body) = parse_request_body(i).map_err(|_| {
+            Failure(ParseErr::new("request body parse failed".to_string(), i))
+        })?;
+    }
 
     Ok((i, Request {
         method: Method::from(line.method),
         path: line.path.fragment().to_string(),
         version: line.version,
+        title: title.to_string(),
         headers,
         body,
     }))
 }
+
+pub fn parse_optional_title_line(i: Span) -> IResult<Span> {
+    let (i, optional) = opt(tuple((
+        tag("###"),
+        opt(tag(" ")),
+        take_until(CRLF),
+        crlf
+    )))(i)?;
+
+    if optional.is_some() {
+        let (_, _, title, _) = optional.unwrap();
+        return Ok((i, title))
+    }
+
+    return Ok((i, i))
+}
+
+
+fn empty_lines(i: Span) -> IResult<Span> {
+    alt((tag(CRLF), tag("\n"), tag("\r"), eof))(i)
+}
+
+
+fn is_line_ending(i: char) -> bool {
+    return i == '\n'
+}
+
+
+pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {
+    let mut requests = vec![];
+    let mut rest = i;
+
+    loop {
+        let (i, req) = parse_request(rest)?;
+        requests.push(req);
+
+        if eof::<Span, ParseErr>(i).is_ok() {
+            break;
+        }
+        rest = i;
+    }
+
+    Ok((i, requests))
+}
+
 
 fn print(label: &str, i: &[u8]) {
     println!("{}: {:?}", label, std::str::from_utf8(i));
