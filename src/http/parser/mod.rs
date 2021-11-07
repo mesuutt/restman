@@ -103,7 +103,7 @@ fn parse_request_body(i: Span) -> IResult<MessageBody> {
 
 fn parse_input_file_ref(i: Span) -> IResult<MessageBody> {
     let (i, (_, _, file_path)) =
-        tuple((tag(">"), tag(" "), take_while(|x| x != '\n' && x != '\r')))(i)?;
+        tuple((tag("<"), tag(" "), take_while(|x| x != '\n' && x != '\r')))(i)?;
     Ok((i, MessageBody::File(file_path)))
 }
 

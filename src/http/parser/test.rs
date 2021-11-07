@@ -137,14 +137,14 @@ mod test {
 
     #[test]
     fn it_should_parse_if_input_file_ref_given_as_body() {
-        let input = LocatedSpan::new("> input.json");
+        let input = LocatedSpan::new("< ./input.json");
 
         let (i, s) = parse_input_file_ref(input).unwrap();
 
         assert!(i.is_empty());
 
         if let MessageBody::File(s) = s {
-            assert_eq!(s.fragment(), &"input.json")
+            assert_eq!(s.fragment(), &"./input.json")
         } else {
             assert!(false, "input file ref cannot parsed");
         };
