@@ -7,8 +7,12 @@ use nom::multi::many0;
 use nom::sequence::{terminated, tuple};
 use nom::Err::{Error, Failure};
 use nom_locate::LocatedSpan;
+use crate::http::parser::error::ParseErr;
+use crate::http::parser::ast::{Version, Header, MessageBody, Request, Method};
 
 mod test;
+mod error;
+mod ast;
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 
@@ -22,130 +26,12 @@ const NEW_LINE: &str = "\r\n";
 
 const SCRIPT_START_TAG: &str = "> ";
 
-#[derive(Debug, PartialEq)]
-pub struct ParseErr<'a> {
-    span: Span<'a>,
-    message: Option<String>,
-}
-
-impl<'a> ParseErr<'a> {
-    pub fn new(message: String, span: Span<'a>) -> Self {
-        Self {
-            span,
-            message: Some(message),
-        }
-    }
-
-    pub fn span(&self) -> &Span {
-        &self.span
-    }
-
-    pub fn line(&self) -> u32 {
-        self.span().location_line()
-    }
-
-    pub fn offset(&self) -> usize {
-        self.span().location_offset()
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for ParseErr<'a> {
-    fn from_error_kind(input: Span<'a>, kind: nom::error::ErrorKind) -> Self {
-        Self::new(format!("parse error {:?}", kind), input)
-    }
-
-    fn append(_input: Span<'a>, _kind: nom::error::ErrorKind, other: Self) -> Self {
-        other
-    }
-
-    fn from_char(input: Span<'a>, c: char) -> Self {
-        Self::new(format!("unexpected character '{}'", c), input)
-    }
-
-    fn or(self, other: Self) -> Self {
-        let message = format!(
-            "{}\tOR\n{}\n",
-            self.message.unwrap_or("".to_string()),
-            other.message.unwrap_or("".to_string())
-        );
-        Self::new(message, other.span)
-    }
-}
 
 #[derive(PartialEq, Debug)]
 pub struct RequestLine<'a> {
     pub method: Span<'a>,
     pub path: Span<'a>,
     pub version: Version,
-}
-
-#[derive(PartialEq, Debug)]
-pub struct Request<'a> {
-    method: Method,
-    path: String,
-    version: Version,
-    headers: Vec<Header<'a>>,
-    body: MessageBody<'a>,
-    title: String,
-    script: String,
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum Method {
-    Get,
-    Post,
-    Head,
-    Options,
-    Put,
-    Patch,
-    Delete,
-    Custom(String),
-}
-
-#[derive(PartialEq, Debug)]
-pub enum MessageBody<'a> {
-    Bytes(Span<'a>),
-    Empty,
-    File(Span<'a>),
-}
-
-impl From<Span<'_>> for Method {
-    fn from(i: Span) -> Self {
-        match i.fragment().as_bytes() {
-            b"GET" => Method::Get,
-            b"POST" => Method::Post,
-            b"HEAD" => Method::Head,
-            b"OPTIONS" => Method::Options,
-            b"PUT" => Method::Put,
-            b"PATCH" => Method::Patch,
-            b"DELETE" => Method::Delete,
-            x => Method::Custom(String::from_utf8_lossy(x).to_string()),
-        }
-    }
-}
-
-#[derive(PartialEq, Debug, Clone, Copy)]
-pub enum Version {
-    V10,
-    V11,
-}
-
-#[derive(Debug)]
-pub struct Header<'a> {
-    pub name: Span<'a>,
-    pub value: Span<'a>,
-}
-
-impl<'a> PartialEq for Header<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        self.name.fragment() == other.name.fragment()
-            && self.value.fragment() == other.value.fragment()
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        self.name.fragment() != other.name.fragment()
-            || self.value.fragment() != other.value.fragment()
-    }
 }
 
 fn request_line(i: Span) -> IResult<RequestLine> {
@@ -295,9 +181,6 @@ pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {
     Ok((i, requests))
 }
 
-fn print(label: &str, i: &[u8]) {
-    println!("{}: {:?}", label, std::str::from_utf8(i));
-}
 
 fn is_token_char(i: char) -> bool {
     is_alphanumeric(i as u8) || "!#$%&'*+-.^_`|~".contains(i)
