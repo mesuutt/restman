@@ -1,11 +1,11 @@
-use crate::http::parser::ast::{Header, MessageBody, Method, Request, Version};
+use crate::http::parser::ast::{Header, MessageBody, Method, Request, Version, ScriptHandler};
 use crate::http::parser::error::ParseErr;
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until, take_while};
+use nom::bytes::complete::{tag, take_until, take_while, take_until1};
 use nom::character::complete::{char, line_ending, one_of};
 use nom::character::is_alphanumeric;
 use nom::combinator::{eof, opt, rest};
-use nom::multi::many0;
+use nom::multi::{many0, many1};
 use nom::sequence::{terminated, tuple};
 use nom::Err::{Error, Failure};
 use nom_locate::LocatedSpan;
@@ -24,20 +24,39 @@ const NEW_LINE: &str = "\n";
 #[cfg(target_os = "windows")]
 const NEW_LINE: &str = "\r\n";
 
-const SCRIPT_START_TAG: &str = "> ";
+const SCRIPT_START: &str = "> ";
+const SCRIPT_END: &str = "%}";
 
 #[derive(PartialEq, Debug)]
 pub struct RequestLine<'a> {
     pub method: Span<'a>,
-    pub path: Span<'a>,
+    pub target: Span<'a>,
     pub version: Version,
 }
+
+
+pub fn parse_request_title(i: Span) -> IResult<Span> {
+    let (i, optional) = opt(tuple((
+        tag("###"),
+        opt(tag(" ")),
+        take_until(NEW_LINE),
+        tag(NEW_LINE),
+    )))(i)?;
+
+    let (_, _, title, _) = optional.ok_or(Error(ParseErr::new(
+        "request title parse failed".to_string(),
+        i,
+    )))?;
+
+    return Ok((i, title));
+}
+
 
 fn request_line(i: Span) -> IResult<RequestLine> {
     // [method required-whitespace] request-target [required-whitespace http-version]
     let (i, method) = token(i)?;
     let (i, _) = sp(i)?;
-    let (i, path) = vchar_1(i)?; // TODO: handle all valid urls, read rfc
+    let (i, target) = vchar_1(i)?; // TODO: handle all valid urls, read rfc
     let (i, _) = take_while(is_space)(i)?;
     let (i, version) = http_version(i)?;
     let (i, _) = many0(tag(NEW_LINE))(i)?;
@@ -47,7 +66,7 @@ fn request_line(i: Span) -> IResult<RequestLine> {
         RequestLine {
             method,
             version,
-            path,
+            target,
         },
     ))
 }
@@ -91,7 +110,7 @@ fn parse_headers(i: Span) -> IResult<Vec<Header>> {
 // consume content until EOF or script start
 fn parse_request_body(i: Span) -> IResult<MessageBody> {
     // TODO: can we consume until eof, but return Option::None instead ""
-    let (i, body) = opt(terminated(rest, alt((eof, tag(SCRIPT_START_TAG)))))(i)?;
+    let (i, body) = opt(terminated(rest, alt((eof, tag(SCRIPT_START)))))(i)?;
 
     // TODO: if we get None when consumed span is only EOF, we can remove fragment check
     if body.is_none() || body.unwrap().is_empty() {
@@ -105,6 +124,35 @@ fn parse_input_file_ref(i: Span) -> IResult<MessageBody> {
     let (i, (_, _, file_path)) =
         tuple((tag("<"), tag(" "), take_while(|x| x != '\n' && x != '\r')))(i)?;
     Ok((i, MessageBody::File(file_path)))
+}
+
+fn parse_script_handle(i: Span) -> IResult<ScriptHandler> {
+    alt((parse_inline_script_handler, parse_external_script_handler))(i)
+}
+
+fn parse_inline_script_handler(i: Span) -> IResult<ScriptHandler> {
+    // ‘>’ required-whitespace ‘{%’ handler-script ‘%}’
+    let (i, (_, _, script, _, _)) = tuple((
+        tag("> "),
+        tag("{%"),
+        take_until1(SCRIPT_END),
+        tag(SCRIPT_END),
+        many0(tag(NEW_LINE))
+    ))(i)?;
+
+    Ok((i, ScriptHandler::Inline(script)))
+}
+
+fn parse_external_script_handler(i: Span) -> IResult<ScriptHandler> {
+    // ‘>’ required-whitespace file-path
+    let (i, (_, path, _)) = tuple((
+        tag("> "),
+        take_until1(NEW_LINE),
+        many0(tag(NEW_LINE))
+    ))(i)?;
+
+    return Ok((i, ScriptHandler::File(path)));
+
 }
 
 pub fn parse_request(i: Span) -> IResult<Request> {
@@ -127,30 +175,14 @@ pub fn parse_request(i: Span) -> IResult<Request> {
         i,
         Request {
             method: Method::from(line.method),
-            path: line.path.fragment().to_string(),
+            target: line.target.fragment().to_string(),
             version: line.version,
             title: title.to_string(),
             headers,
             body,
-            script: "".to_string(),
+            script: None,
         },
     ))
-}
-
-pub fn parse_request_title(i: Span) -> IResult<Span> {
-    let (i, optional) = opt(tuple((
-        tag("###"),
-        opt(tag(" ")),
-        take_until(NEW_LINE),
-        tag(NEW_LINE),
-    )))(i)?;
-
-    let (_, _, title, _) = optional.ok_or(Error(ParseErr::new(
-        "request title parse failed".to_string(),
-        i,
-    )))?;
-
-    return Ok((i, title));
 }
 
 pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {

@@ -3,12 +3,12 @@ use crate::http::parser::Span;
 #[derive(PartialEq, Debug)]
 pub struct Request<'a> {
     pub method: Method,
-    pub path: String,
+    pub target: String,
     pub version: Version,
     pub headers: Vec<Header<'a>>,
     pub body: MessageBody<'a>,
     pub title: String,
-    pub script: String,
+    pub script: Option<ScriptHandler<'a>>,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -66,5 +66,26 @@ impl<'a> PartialEq for Header<'a> {
     fn ne(&self, other: &Self) -> bool {
         self.name.fragment() != other.name.fragment()
             || self.value.fragment() != other.value.fragment()
+    }
+}
+
+#[derive(Debug)]
+pub enum ScriptHandler<'a> {
+    File(Span<'a>),
+    Inline(Span<'a>)
+}
+
+impl<'a> PartialEq for ScriptHandler<'a> {
+    fn eq(&self, other: &Self) -> bool {
+       match (self, other) {
+           (Self::Inline(x), Self::Inline(y)) => x.fragment() == y.fragment(),
+           (Self::File(x), Self::File(y)) => x.fragment() == y.fragment(),
+           (Self::File(_), Self::Inline(_)) => false,
+           (Self::Inline(_), Self::File(_)) => false,
+       }
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        todo!()
     }
 }

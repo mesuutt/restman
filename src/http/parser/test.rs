@@ -3,10 +3,8 @@ mod test {
     use indoc::indoc;
     use nom_locate::LocatedSpan;
 
-    use crate::http::parser::{
-        header_line, parse_headers, parse_input_file_ref, parse_multiple_request, parse_request,
-        parse_request_body, request_line, Header, MessageBody, Method, RequestLine, Version,
-    };
+    use crate::http::parser::{header_line, parse_headers, parse_input_file_ref, parse_multiple_request, parse_request, parse_request_body, request_line, Header, MessageBody, Method, RequestLine, Version, parse_inline_script_handler, parse_external_script_handler, parse_script_handle};
+    use crate::http::parser::ast::ScriptHandler;
 
     #[test]
     fn it_should_parse_request_line_with_version() {
@@ -14,7 +12,7 @@ mod test {
         let result = request_line(input);
         let expected = RequestLine {
             method: LocatedSpan::new("GET"),
-            path: LocatedSpan::new("/index.html"),
+            target: LocatedSpan::new("/index.html"),
             version: Version::V11,
         };
 
@@ -23,7 +21,7 @@ mod test {
 
         assert_eq!(line.method, expected.method);
         assert_eq!(line.version, expected.version);
-        assert_eq!(line.path.fragment(), expected.path.fragment());
+        assert_eq!(line.target.fragment(), expected.target.fragment());
     }
 
     #[test]
@@ -99,7 +97,7 @@ mod test {
 
         assert_eq!(result.title, "My request");
         assert_eq!(result.method, Method::Get);
-        assert_eq!(result.path, "/index.html".to_string());
+        assert_eq!(result.target, "/index.html".to_string());
         assert_eq!(result.version, Version::V11);
 
         assert_eq!(result.headers.len(), 2);
@@ -130,8 +128,6 @@ mod test {
         });
         let (_i, result) = parse_multiple_request(input).unwrap();
 
-        // Bu fonksiyon icerisindeki yorumu oku
-        assert!(false);
         assert_eq!(result.len(), 2);
     }
 
@@ -164,4 +160,32 @@ mod test {
 
         assert!(i.is_empty());
     }
+
+    #[test]
+    fn it_should_parse_inline_script_handler() {
+        let input = LocatedSpan::new("> {% my script %}\n");
+        let (i, h) = parse_inline_script_handler(input).unwrap();
+
+        assert!(i.is_empty());
+        assert_eq!(h, ScriptHandler::Inline(LocatedSpan::new(" my script ")));
+    }
+
+    #[test]
+    fn it_should_parse_external_script_handler() {
+        let input = LocatedSpan::new("> ./my-script.js\n");
+        let (i, h) = parse_external_script_handler(input).unwrap();
+
+        assert!(i.is_empty());
+        assert_eq!(h, ScriptHandler::File(LocatedSpan::new("./my-script.js")));
+    }
+
+    #[test]
+    fn  it_should_parse_script_handle() {
+        let (i1, _) = parse_script_handle(LocatedSpan::new("> ./foo.js\n")).unwrap();
+        let (i2, _) = parse_script_handle(LocatedSpan::new("> {% my inline script %}\n")).unwrap();
+
+        assert!(i1.is_empty());
+        assert!(i2.is_empty());
+    }
+
 }
