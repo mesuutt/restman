@@ -1,3 +1,5 @@
+use crate::http::parser::ast::{Header, MessageBody, Method, Request, Version};
+use crate::http::parser::error::ParseErr;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_while};
 use nom::character::complete::{char, line_ending, one_of};
@@ -7,12 +9,10 @@ use nom::multi::many0;
 use nom::sequence::{terminated, tuple};
 use nom::Err::{Error, Failure};
 use nom_locate::LocatedSpan;
-use crate::http::parser::error::ParseErr;
-use crate::http::parser::ast::{Version, Header, MessageBody, Request, Method};
 
-mod test;
-mod error;
 mod ast;
+mod error;
+mod test;
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 
@@ -25,7 +25,6 @@ const NEW_LINE: &str = "\n";
 const NEW_LINE: &str = "\r\n";
 
 const SCRIPT_START_TAG: &str = "> ";
-
 
 #[derive(PartialEq, Debug)]
 pub struct RequestLine<'a> {
@@ -154,14 +153,6 @@ pub fn parse_request_title(i: Span) -> IResult<Span> {
     return Ok((i, title));
 }
 
-fn empty_lines(i: Span) -> IResult<Span> {
-    alt((tag(NEW_LINE), tag("\n"), tag("\r"), eof))(i)
-}
-
-fn is_line_ending(i: char) -> bool {
-    return i == '\n';
-}
-
 pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {
     let mut requests = vec![];
     let mut rest = i;
@@ -181,22 +172,29 @@ pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {
     Ok((i, requests))
 }
 
+fn token(i: Span) -> IResult<Span> {
+    take_while(is_token_char)(i)
+}
+
+fn vchar_1(i: Span) -> IResult<Span> {
+    take_while(is_vchar)(i)
+}
+
+fn empty_lines(i: Span) -> IResult<Span> {
+    alt((tag(NEW_LINE), tag("\n"), tag("\r"), eof))(i)
+}
+
+fn is_line_ending(i: char) -> bool {
+    return i == '\n';
+}
 
 fn is_token_char(i: char) -> bool {
     is_alphanumeric(i as u8) || "!#$%&'*+-.^_`|~".contains(i)
 }
 
-fn token(i: Span) -> IResult<Span> {
-    take_while(is_token_char)(i)
-}
-
 fn is_vchar(i: char) -> bool {
     // c.is_alphabetic()
     i as u32 > 32 && i as u32 <= 126
-}
-
-fn vchar_1(i: Span) -> IResult<Span> {
-    take_while(is_vchar)(i)
 }
 
 fn is_space(x: char) -> bool {

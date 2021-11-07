@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use indoc::indoc;
 use nom_locate::LocatedSpan;
 use restman::http::parse_request;
-use indoc::indoc;
 
 fn request_parsing_benchmark(c: &mut Criterion) {
     let input = LocatedSpan::new(indoc! {r#"GET /index.html HTTP/1.1
