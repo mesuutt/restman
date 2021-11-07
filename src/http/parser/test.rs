@@ -3,7 +3,10 @@ mod test {
     use indoc::indoc;
     use nom_locate::LocatedSpan;
 
-    use crate::http::parser::{Header, header_line, MessageBody, Method, parse_headers, parse_input_file_ref, parse_multiple_request, parse_request, parse_request_body, request_line, RequestLine, Version};
+    use crate::http::parser::{
+        header_line, parse_headers, parse_input_file_ref, parse_multiple_request, parse_request,
+        parse_request_body, request_line, Header, MessageBody, Method, RequestLine, Version,
+    };
 
     #[test]
     fn it_should_parse_request_line_with_version() {
@@ -116,7 +119,6 @@ mod test {
         assert_eq!(result.body, MessageBody::Empty);
     }
 
-
     // #[test]
     fn multiple_request_parser_test() {
         let input = LocatedSpan::new(indoc! {
@@ -133,7 +135,6 @@ mod test {
         assert_eq!(result.len(), 2);
     }
 
-
     #[test]
     fn it_should_parse_if_input_file_ref_given_as_body() {
         let input = LocatedSpan::new("> input.json");
@@ -148,7 +149,6 @@ mod test {
             assert!(false, "input file ref cannot parsed");
         };
     }
-
 
     #[test]
     fn it_should_parse_request_body_with_multiple_lines() {

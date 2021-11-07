@@ -1,13 +1,11 @@
-
-
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_while};
-use nom::character::{is_alphanumeric};
 use nom::character::complete::{char, line_ending, one_of};
+use nom::character::is_alphanumeric;
 use nom::combinator::{eof, opt, rest};
-use nom::Err::{Error, Failure};
-use nom::multi::{many0};
+use nom::multi::many0;
 use nom::sequence::{terminated, tuple};
+use nom::Err::{Error, Failure};
 use nom_locate::LocatedSpan;
 
 mod test;
@@ -32,16 +30,24 @@ pub struct ParseErr<'a> {
 
 impl<'a> ParseErr<'a> {
     pub fn new(message: String, span: Span<'a>) -> Self {
-        Self { span, message: Some(message) }
+        Self {
+            span,
+            message: Some(message),
+        }
     }
 
-    pub fn span(&self) -> &Span { &self.span }
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
 
-    pub fn line(&self) -> u32 { self.span().location_line() }
+    pub fn line(&self) -> u32 {
+        self.span().location_line()
+    }
 
-    pub fn offset(&self) -> usize { self.span().location_offset() }
+    pub fn offset(&self) -> usize {
+        self.span().location_offset()
+    }
 }
-
 
 impl<'a> nom::error::ParseError<Span<'a>> for ParseErr<'a> {
     fn from_error_kind(input: Span<'a>, kind: nom::error::ErrorKind) -> Self {
@@ -57,11 +63,14 @@ impl<'a> nom::error::ParseError<Span<'a>> for ParseErr<'a> {
     }
 
     fn or(self, other: Self) -> Self {
-        let message = format!("{}\tOR\n{}\n", self.message.unwrap_or("".to_string()), other.message.unwrap_or("".to_string()));
+        let message = format!(
+            "{}\tOR\n{}\n",
+            self.message.unwrap_or("".to_string()),
+            other.message.unwrap_or("".to_string())
+        );
         Self::new(message, other.span)
     }
 }
-
 
 #[derive(PartialEq, Debug)]
 pub struct RequestLine<'a> {
@@ -208,35 +217,39 @@ fn parse_request_body(i: Span) -> IResult<MessageBody> {
 }
 
 fn parse_input_file_ref(i: Span) -> IResult<MessageBody> {
-    let (i, (_, _, file_path)) = tuple((tag(">"), tag(" "), take_while(|x| x != '\n' && x != '\r')))(i)?;
+    let (i, (_, _, file_path)) =
+        tuple((tag(">"), tag(" "), take_while(|x| x != '\n' && x != '\r')))(i)?;
     Ok((i, MessageBody::File(file_path)))
 }
-
 
 pub fn parse_request(i: Span) -> IResult<Request> {
     let (i, title) = parse_request_title(i).unwrap_or((i, Span::new("")));
 
-    let (i, line) = request_line(i).map_err(|_| {
-        Failure(ParseErr::new("request line parse failed".to_string(), i))
-    })?;
+    let (i, line) = request_line(i)
+        .map_err(|_| Failure(ParseErr::new("request line parse failed".to_string(), i)))?;
 
     let (i, headers) = parse_headers(i).map_err(|_| {
-        Failure(ParseErr::new("request headers cannot parsed".to_string(), i))
+        Failure(ParseErr::new(
+            "request headers cannot parsed".to_string(),
+            i,
+        ))
     })?;
 
-    let (i, body) = parse_request_body(i).map_err(|_| {
-        Failure(ParseErr::new("request body parse failed".to_string(), i))
-    })?;
+    let (i, body) = parse_request_body(i)
+        .map_err(|_| Failure(ParseErr::new("request body parse failed".to_string(), i)))?;
 
-    Ok((i, Request {
-        method: Method::from(line.method),
-        path: line.path.fragment().to_string(),
-        version: line.version,
-        title: title.to_string(),
-        headers,
-        body,
-        script: "".to_string(),
-    }))
+    Ok((
+        i,
+        Request {
+            method: Method::from(line.method),
+            path: line.path.fragment().to_string(),
+            version: line.version,
+            title: title.to_string(),
+            headers,
+            body,
+            script: "".to_string(),
+        },
+    ))
 }
 
 pub fn parse_request_title(i: Span) -> IResult<Span> {
@@ -244,19 +257,20 @@ pub fn parse_request_title(i: Span) -> IResult<Span> {
         tag("###"),
         opt(tag(" ")),
         take_until(NEW_LINE),
-        tag(NEW_LINE)
+        tag(NEW_LINE),
     )))(i)?;
 
-    let (_, _, title, _) = optional.ok_or(Error(ParseErr::new("request title parse failed".to_string(), i)))?;
+    let (_, _, title, _) = optional.ok_or(Error(ParseErr::new(
+        "request title parse failed".to_string(),
+        i,
+    )))?;
 
     return Ok((i, title));
 }
 
-
 fn empty_lines(i: Span) -> IResult<Span> {
     alt((tag(NEW_LINE), tag("\n"), tag("\r"), eof))(i)
 }
-
 
 fn is_line_ending(i: char) -> bool {
     return i == '\n';
@@ -280,7 +294,6 @@ pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {
 
     Ok((i, requests))
 }
-
 
 fn print(label: &str, i: &[u8]) {
     println!("{}: {:?}", label, std::str::from_utf8(i));
