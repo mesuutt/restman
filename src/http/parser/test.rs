@@ -85,7 +85,7 @@ mod test {
     }
 
     #[test]
-    fn it_should_parse_() {
+    fn it_should_parse_request_with_title_and_body() {
         let input = LocatedSpan::new(indoc! {
             "###My request
             GET /index.html HTTP/1.1
