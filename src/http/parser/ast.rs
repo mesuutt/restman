@@ -8,7 +8,7 @@ pub struct Request<'a> {
     pub headers: Vec<Header<'a>>,
     pub body: MessageBody<'a>,
     pub title: String,
-    pub script: Option<ScriptHandler<'a>>,
+    pub script: ScriptHandler<'a>,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -72,7 +72,8 @@ impl<'a> PartialEq for Header<'a> {
 #[derive(Debug)]
 pub enum ScriptHandler<'a> {
     File(Span<'a>),
-    Inline(Span<'a>)
+    Inline(Span<'a>),
+    Empty,
 }
 
 impl<'a> PartialEq for ScriptHandler<'a> {
@@ -80,8 +81,8 @@ impl<'a> PartialEq for ScriptHandler<'a> {
        match (self, other) {
            (Self::Inline(x), Self::Inline(y)) => x.fragment() == y.fragment(),
            (Self::File(x), Self::File(y)) => x.fragment() == y.fragment(),
-           (Self::File(_), Self::Inline(_)) => false,
-           (Self::Inline(_), Self::File(_)) => false,
+           (Self::Empty, Self::Empty) => true,
+           (_, _) => false,
        }
     }
 

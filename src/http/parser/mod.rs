@@ -1,14 +1,15 @@
 use crate::http::parser::ast::{Header, MessageBody, Method, Request, Version, ScriptHandler};
 use crate::http::parser::error::ParseErr;
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until, take_while, take_until1};
-use nom::character::complete::{char, line_ending, one_of};
+use nom::bytes::complete::{tag, take_until, take_while, take_until1, is_not, take_while1};
+use nom::character::complete::{char, line_ending, one_of, multispace0, newline, none_of};
 use nom::character::is_alphanumeric;
 use nom::combinator::{eof, opt, rest};
 use nom::multi::{many0, many1};
-use nom::sequence::{terminated, tuple};
+use nom::sequence::{terminated, tuple, preceded, delimited, pair};
 use nom::Err::{Error, Failure};
 use nom_locate::LocatedSpan;
+use nom::Err;
 
 mod ast;
 mod error;
@@ -110,14 +111,14 @@ fn parse_headers(i: Span) -> IResult<Vec<Header>> {
 // consume content until EOF or script start
 fn parse_request_body(i: Span) -> IResult<MessageBody> {
     // TODO: can we consume until eof, but return Option::None instead ""
-    let (i, body) = opt(terminated(rest, alt((eof, tag(SCRIPT_START)))))(i)?;
+    let (i, body) = terminated(rest, alt((eof, tag(SCRIPT_START))))(i)?;
 
     // TODO: if we get None when consumed span is only EOF, we can remove fragment check
-    if body.is_none() || body.unwrap().is_empty() {
+    if body.is_empty() {
         return Ok((i, MessageBody::Empty));
     }
 
-    Ok((i, MessageBody::Bytes(body.unwrap())))
+    Ok((i, MessageBody::Bytes(body)))
 }
 
 fn parse_input_file_ref(i: Span) -> IResult<MessageBody> {
@@ -126,11 +127,19 @@ fn parse_input_file_ref(i: Span) -> IResult<MessageBody> {
     Ok((i, MessageBody::File(file_path)))
 }
 
-fn parse_script_handle(i: Span) -> IResult<ScriptHandler> {
-    alt((parse_inline_script_handler, parse_external_script_handler))(i)
+fn parse_script(i: Span) -> IResult<ScriptHandler> {
+    alt((
+        parse_inline_script,
+        parse_external_script,
+        // We are returning empty instead returning error
+        // because if script is given but has an error
+        // how we know the error is relevant to parsing or because there is no script
+        // TODO: maybe we can raise specific ParseErr and check it
+        |i| Ok((i, ScriptHandler::Empty))
+    ))(i)
 }
 
-fn parse_inline_script_handler(i: Span) -> IResult<ScriptHandler> {
+fn parse_inline_script(i: Span) -> IResult<ScriptHandler> {
     // ‘>’ required-whitespace ‘{%’ handler-script ‘%}’
     let (i, (_, _, script, _, _)) = tuple((
         tag("> "),
@@ -143,7 +152,7 @@ fn parse_inline_script_handler(i: Span) -> IResult<ScriptHandler> {
     Ok((i, ScriptHandler::Inline(script)))
 }
 
-fn parse_external_script_handler(i: Span) -> IResult<ScriptHandler> {
+fn parse_external_script(i: Span) -> IResult<ScriptHandler> {
     // ‘>’ required-whitespace file-path
     let (i, (_, path, _)) = tuple((
         tag("> "),
@@ -152,7 +161,6 @@ fn parse_external_script_handler(i: Span) -> IResult<ScriptHandler> {
     ))(i)?;
 
     return Ok((i, ScriptHandler::File(path)));
-
 }
 
 pub fn parse_request(i: Span) -> IResult<Request> {
@@ -169,7 +177,9 @@ pub fn parse_request(i: Span) -> IResult<Request> {
     })?;
 
     let (i, body) = parse_request_body(i)
-        .map_err(|_| Failure(ParseErr::new("request body parse failed".to_string(), i)))?;
+        .map_err(|x| Failure(ParseErr::new(format!("request body parse failed: {:?}", x), i)))?;
+
+    let (i, script) = parse_script(i)?;
 
     Ok((
         i,
@@ -180,7 +190,7 @@ pub fn parse_request(i: Span) -> IResult<Request> {
             title: title.to_string(),
             headers,
             body,
-            script: None,
+            script,
         },
     ))
 }
