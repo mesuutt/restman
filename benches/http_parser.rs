@@ -1,15 +1,15 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use nom_locate::LocatedSpan;
 use restman::http::parse_request;
+use indoc::indoc;
 
 fn request_parsing_benchmark(c: &mut Criterion) {
-    let input = LocatedSpan::new(
-        "GET /index.html HTTP/1.1\r\n\
-        Content-type: application/json\r\n\
-        Authorization: bearer token\r\n\
-        \r\n\
-        {\"foo\": \"bar\"}\r\n",
-    );
+    let input = LocatedSpan::new(indoc! {r#"GET /index.html HTTP/1.1
+        Content-type: application/json
+        Authorization: bearer token
+
+        {\"foo\": \"bar\"}"#
+    });
 
     c.bench_function("parse http request", |b| {
         b.iter(|| {
