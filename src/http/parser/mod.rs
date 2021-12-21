@@ -5,7 +5,7 @@ use nom::bytes::complete::{tag, take_until, take_while, take_until1, is_not, tak
 use nom::character::complete::{char, line_ending, one_of, multispace0, newline, none_of};
 use nom::character::is_alphanumeric;
 use nom::combinator::{eof, opt, rest};
-use nom::multi::{many0, many1};
+use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{terminated, tuple, preceded, delimited, pair};
 use nom::Err::{Error, Failure};
 use nom_locate::LocatedSpan;
@@ -128,6 +128,7 @@ fn parse_input_file_ref(i: Span) -> IResult<MessageBody> {
 }
 
 fn parse_script(i: Span) -> IResult<ScriptHandler> {
+
     alt((
         parse_inline_script,
         parse_external_script,

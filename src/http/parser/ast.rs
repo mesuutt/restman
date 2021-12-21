@@ -30,6 +30,16 @@ pub enum MessageBody<'a> {
     File(Span<'a>),
 }
 
+impl<'a> MessageBody<'a> {
+    pub fn get_span(&'a self) -> Option<&'a Span> {
+        match self {
+            MessageBody::Bytes(x) => Some(x),
+            MessageBody::Empty => None,
+            MessageBody::File(x) =>  Some(x)
+        }
+    }
+}
+
 impl From<Span<'_>> for Method {
     fn from(i: Span) -> Self {
         match i.fragment().as_bytes() {

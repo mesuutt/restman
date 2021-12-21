@@ -1,10 +1,11 @@
 #[cfg(test)]
 mod test {
-    use indoc::indoc;
+    use indoc::{formatdoc, indoc};
     use nom_locate::LocatedSpan;
 
     use crate::http::parser::{header_line, parse_headers, parse_input_file_ref, parse_multiple_request, parse_request, parse_request_body, request_line, Header, MessageBody, Method, RequestLine, Version, parse_inline_script, parse_external_script, parse_script};
     use crate::http::parser::ast::ScriptHandler;
+    use nom::character::complete::multispace0;
 
     #[test]
     fn it_should_parse_request_line_with_version() {
@@ -101,15 +102,27 @@ mod test {
         assert_eq!(result.version, Version::V11);
 
         assert_eq!(result.headers.len(), 2);
-
-        if let MessageBody::Bytes(span) = result.body {
-            assert_eq!(span.fragment(), &r#"{"foo": "bar"}"#);
-        } else {
-            assert!(false, "message body not matches")
-        }
-
+        assert_eq!(result.body.get_span().unwrap().fragment(), &r#"{"foo": "bar"}"#);
     }
 
+    #[test]
+    fn parse_multiline_body() {
+        let body = "{\n\n  \"foo\": \"bar\"\n\n}";
+
+        let request_input = formatdoc! {
+            "
+            GET /index.html HTTP/1.1
+
+            {body}",
+            body = body
+        };
+        let input = LocatedSpan::new(request_input.as_str());
+
+        let (span, result) = parse_request(input).unwrap();
+
+        assert_eq!(span.fragment(), &"");
+        assert_eq!(result.body.get_span().unwrap().fragment(), &body);
+    }
 
     #[test]
     fn it_should_parse_request_without_body() {
@@ -137,15 +150,10 @@ mod test {
     fn it_should_parse_if_input_file_ref_given_as_body() {
         let input = LocatedSpan::new("< ./input.json");
 
-        let (i, s) = parse_input_file_ref(input).unwrap();
+        let (i, body) = parse_input_file_ref(input).unwrap();
 
         assert!(i.is_empty());
-
-        if let MessageBody::File(s) = s {
-            assert_eq!(s.fragment(), &"./input.json")
-        } else {
-            assert!(false, "input file ref cannot parsed");
-        };
+        assert_eq!(body.get_span().unwrap().fragment(), &"./input.json");
     }
 
     #[test]
