@@ -1,1 +1,1 @@
-WIP Postman like http request tool that works on command-line.
+Work in progress
