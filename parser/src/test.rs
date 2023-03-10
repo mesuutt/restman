@@ -3,7 +3,7 @@ mod test {
     use indoc::{formatdoc, indoc};
     use nom_locate::LocatedSpan;
 
-    use crate::parser::*;
+    use crate::parsers::*;
     use nom::character::complete::multispace0;
     use crate::ast::{Header, MessageBody, Method, ScriptHandler, Version};
 

@@ -1,4 +1,4 @@
-use crate::parser::Span;
+use crate::parsers::Span;
 
 #[derive(PartialEq, Debug)]
 pub struct Request<'a> {

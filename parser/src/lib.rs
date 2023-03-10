@@ -1,6 +1,6 @@
 mod ast;
 mod error;
 mod test;
-mod parser;
+mod parsers;
 
-pub use parser::parse_request;
+pub use parsers::parse_request;
