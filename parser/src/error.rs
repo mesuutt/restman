@@ -1,4 +1,4 @@
-use crate::http::parser::Span;
+use crate::parser::Span;
 
 #[derive(Debug, PartialEq)]
 pub struct ParseErr<'a> {

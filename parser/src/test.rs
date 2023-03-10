@@ -3,9 +3,9 @@ mod test {
     use indoc::{formatdoc, indoc};
     use nom_locate::LocatedSpan;
 
-    use crate::http::parser::{header_line, parse_headers, parse_input_file_ref, parse_multiple_request, parse_request, parse_request_body, request_line, Header, MessageBody, Method, RequestLine, Version, parse_inline_script, parse_external_script, parse_script};
-    use crate::http::parser::ast::ScriptHandler;
+    use crate::parser::*;
     use nom::character::complete::multispace0;
+    use crate::ast::{Header, MessageBody, Method, ScriptHandler, Version};
 
     #[test]
     fn it_should_parse_request_line_with_version() {
@@ -197,5 +197,4 @@ mod test {
         assert!(i1.is_empty());
         assert!(i2.is_empty());
     }
-
 }

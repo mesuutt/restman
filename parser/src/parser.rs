@@ -1,5 +1,5 @@
-use crate::http::parser::ast::{Header, MessageBody, Method, Request, Version, ScriptHandler};
-use crate::http::parser::error::ParseErr;
+use crate::ast::{Header, MessageBody, Method, Request, Version, ScriptHandler};
+use crate::error::ParseErr;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_while, take_until1, is_not, take_while1};
 use nom::character::complete::{char, line_ending, one_of, multispace0, newline, none_of};
@@ -10,10 +10,6 @@ use nom::sequence::{terminated, tuple, preceded, delimited, pair};
 use nom::Err::{Error, Failure};
 use nom_locate::LocatedSpan;
 use nom::Err;
-
-mod ast;
-mod error;
-mod test;
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 
@@ -53,7 +49,7 @@ pub fn parse_request_title(i: Span) -> IResult<Span> {
 }
 
 
-fn request_line(i: Span) -> IResult<RequestLine> {
+pub(crate) fn request_line(i: Span) -> IResult<RequestLine> {
     // [method required-whitespace] request-target [required-whitespace http-version]
     let (i, method) = token(i)?;
     let (i, _) = sp(i)?;
@@ -90,7 +86,7 @@ fn http_version(i: Span) -> IResult<Version> {
     ))
 }
 
-fn header_line(i: Span) -> IResult<Header> {
+pub(crate) fn header_line(i: Span) -> IResult<Header> {
     let (i, (name, _, _, value, _)) = tuple((
         token,
         tag(":"),
@@ -102,14 +98,14 @@ fn header_line(i: Span) -> IResult<Header> {
     Ok((i, Header { name, value }))
 }
 
-fn parse_headers(i: Span) -> IResult<Vec<Header>> {
+pub(crate) fn parse_headers(i: Span) -> IResult<Vec<Header>> {
     let (i, headers) = many0(header_line)(i)?;
     let (i, _) = opt(line_ending)(i)?;
     Ok((i, headers))
 }
 
 // consume content until EOF or script start
-fn parse_request_body(i: Span) -> IResult<MessageBody> {
+pub(crate) fn parse_request_body(i: Span) -> IResult<MessageBody> {
     // TODO: can we consume until eof, but return Option::None instead ""
     let (i, body) = terminated(rest, alt((eof, tag(SCRIPT_START))))(i)?;
 
@@ -121,13 +117,13 @@ fn parse_request_body(i: Span) -> IResult<MessageBody> {
     Ok((i, MessageBody::Bytes(body)))
 }
 
-fn parse_input_file_ref(i: Span) -> IResult<MessageBody> {
+pub(crate) fn parse_input_file_ref(i: Span) -> IResult<MessageBody> {
     let (i, (_, _, file_path)) =
         tuple((tag("<"), tag(" "), take_while(|x| x != '\n' && x != '\r')))(i)?;
     Ok((i, MessageBody::File(file_path)))
 }
 
-fn parse_script(i: Span) -> IResult<ScriptHandler> {
+pub(crate) fn parse_script(i: Span) -> IResult<ScriptHandler> {
 
     alt((
         parse_inline_script,
@@ -140,7 +136,7 @@ fn parse_script(i: Span) -> IResult<ScriptHandler> {
     ))(i)
 }
 
-fn parse_inline_script(i: Span) -> IResult<ScriptHandler> {
+pub(crate) fn parse_inline_script(i: Span) -> IResult<ScriptHandler> {
     // ‘>’ required-whitespace ‘{%’ handler-script ‘%}’
     let (i, (_, _, script, _, _)) = tuple((
         tag("> "),
@@ -153,7 +149,7 @@ fn parse_inline_script(i: Span) -> IResult<ScriptHandler> {
     Ok((i, ScriptHandler::Inline(script)))
 }
 
-fn parse_external_script(i: Span) -> IResult<ScriptHandler> {
+pub(crate) fn parse_external_script(i: Span) -> IResult<ScriptHandler> {
     // ‘>’ required-whitespace file-path
     let (i, (_, path, _)) = tuple((
         tag("> "),
