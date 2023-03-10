@@ -74,8 +74,7 @@ impl<'a> PartialEq for Header<'a> {
     }
 
     fn ne(&self, other: &Self) -> bool {
-        self.name.fragment() != other.name.fragment()
-            || self.value.fragment() != other.value.fragment()
+        !self.eq(other)
     }
 }
 
