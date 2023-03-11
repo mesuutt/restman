@@ -148,6 +148,7 @@ pub fn parse_request(i: Span) -> IResult<Request> {
     let (i, headers) = parse_headers(i)?;
     let (i, body) = parse_request_body(i)?;
     let (i, script) = parse_script(i)?;
+    let (i, _) = many0(newline)(i)?;
 
     Ok((
         i,

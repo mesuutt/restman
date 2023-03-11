@@ -195,6 +195,19 @@ mod test {
         } else { assert!(false, "body not matches") }
     }
 
+    #[test]
+    fn it_should_parse_request_if_content_ends_with_newlines() {
+        let input = LocatedSpan::new_extra(indoc! {
+            "### Request 1
+            GET /last.html
+
+            "
+        }, "");
+        let (i, result) = parse_request(input).unwrap();
+        assert_eq!(i.fragment(), &"");
+    }
+
+
 
     #[test]
     fn it_should_parse_if_input_file_ref_given_as_body() {
