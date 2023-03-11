@@ -12,5 +12,13 @@ fn main() {
     file.read_to_string(&mut source).map_err(|_e| "error reading file").unwrap();
 
     let requests = parser::parse(&source);
-    println!("{:?}", requests);
+    for i in requests.iter() {
+        println!("##############################");
+        println!("title: {:?}", i.title);
+        println!("method: {:?}, target: {:?}, version: {:?}", i.method, i.target, i.version);
+        println!("headers: {:?}", i.headers);
+        println!("body: {:?}", i.body);
+        println!("script: {:?}", i.script);
+        println!("##############################");
+    }
 }
