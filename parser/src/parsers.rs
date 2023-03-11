@@ -1,6 +1,6 @@
 use crate::ast::{Header, MessageBody, Method, Request, ScriptHandler, Version};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until1, take_while};
+use nom::bytes::complete::{tag, take_until, take_until1, take_while};
 
 use nom::character::complete::{line_ending, one_of};
 
@@ -121,7 +121,7 @@ pub(crate) fn parse_inline_script(i: Span) -> IResult<ScriptHandler> {
 
 pub(crate) fn parse_external_script(i: Span) -> IResult<ScriptHandler> {
     // ‘>’ required-whitespace file-path
-    let (i, (_, path, _)) = tuple((tag("> "), take_until1(NEW_LINE), many0(tag(NEW_LINE))))(i)?;
+    let (i,  (_, path)) = tuple((tag("> "), alt((take_until(NEW_LINE), rest))))(i)?;
 
     return Ok((i, ScriptHandler::File(path)));
 }

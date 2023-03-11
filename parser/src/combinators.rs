@@ -18,6 +18,7 @@ const SCRIPT_END: &str = "%}";
 
 pub fn request_title(i: Span) -> IResult<Span> {
     let (i, optional) = opt(tuple((
+        many0(tag(NEW_LINE)),
         tag("###"),
         opt(tag(" ")),
         take_until(NEW_LINE),
@@ -28,7 +29,7 @@ pub fn request_title(i: Span) -> IResult<Span> {
         return Ok((i, Span::new("")));
     }
 
-    let (_, _, title, _) = optional.unwrap();
+    let (_, _, _, title, _) = optional.unwrap();
 
     return Ok((i, title));
 }

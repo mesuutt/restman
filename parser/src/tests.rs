@@ -193,7 +193,7 @@ mod test {
 
     #[test]
     fn it_should_parse_external_script_handler() {
-        let input = LocatedSpan::new("> ./my-script.js\n");
+        let input = LocatedSpan::new("> ./my-script.js");
         let (i, h) = parse_external_script(input).unwrap();
 
         assert!(i.is_empty());
@@ -202,10 +202,10 @@ mod test {
 
     #[test]
     fn it_should_parse_script_handle() {
-        let (i1, _) = parse_script(LocatedSpan::new("> ./foo.js\n")).unwrap();
-        let (i2, _) = parse_script(LocatedSpan::new("> {% my inline script %}\n")).unwrap();
+        let (i1, s1) = parse_script(LocatedSpan::new("> ./foo.js\n")).unwrap();
+        let (i2, s2) = parse_script(LocatedSpan::new("> {% my inline script %}\n")).unwrap();
 
-        assert!(i1.is_empty());
-        assert!(i2.is_empty());
+        assert_eq!(s1, ScriptHandler::File(Span::new("./foo.js")));
+        assert_eq!(s2, ScriptHandler::Inline(Span::new(" my inline script ")));
     }
 }
