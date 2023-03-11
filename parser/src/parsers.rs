@@ -6,7 +6,7 @@ use nom::character::complete::{newline, one_of};
 
 use nom::combinator::{eof, opt, peek, rest};
 use nom::multi::{many0, many_till};
-use nom::sequence::{tuple};
+use nom::sequence::tuple;
 
 use nom_locate::LocatedSpan;
 
@@ -175,7 +175,9 @@ pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {
 
 pub fn parse<'a>(filename: &'a str, i: &'a str) -> Vec<Request<'a>> {
     // TODO: error handling
-    let (_, requests) = parse_multiple_request(Span::new_extra(i, filename)).map_err(|e| format!("request parse failed: {:?}", e)).unwrap();
+    let (_, requests) = parse_multiple_request(Span::new_extra(i, filename))
+        .map_err(|e| format!("request parse failed: {:?}", e))
+        .unwrap();
 
     requests
 }

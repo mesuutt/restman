@@ -1,11 +1,11 @@
 use crate::parsers::{IResult, Span};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_until1, take_while};
-use nom::character::complete::{char};
-use nom::character::{is_alphanumeric};
-use nom::combinator::{eof};
-use nom::multi::{many0};
-use nom::sequence::{tuple};
+use nom::character::complete::char;
+use nom::character::is_alphanumeric;
+use nom::combinator::eof;
+use nom::multi::many0;
+use nom::sequence::tuple;
 
 #[cfg(all(not(target_os = "windows")))]
 pub(crate) const NEW_LINE: &str = "\n";
@@ -54,7 +54,7 @@ pub fn header(i: Span) -> IResult<(Span, Span)> {
         tag(":"),
         take_while(is_space_char),
         take_while(is_header_value_char),
-        tag(NEW_LINE)
+        tag(NEW_LINE),
     ))(i)?;
 
     Ok((i, (name, value)))
@@ -101,5 +101,3 @@ pub fn is_space_char(x: char) -> bool {
 pub fn sp(i: Span) -> IResult<char> {
     char(' ')(i)
 }
-
-

@@ -4,7 +4,8 @@ use nom_locate::LocatedSpan;
 use parser::parse_request;
 
 fn request_parsing_benchmark(c: &mut Criterion) {
-    let input = LocatedSpan::new_extra(indoc! {r#"
+    let input = LocatedSpan::new_extra(
+        indoc! {r#"
 
         GET /index.html HTTP/1.1
         Content-type: application/json
@@ -15,7 +16,9 @@ fn request_parsing_benchmark(c: &mut Criterion) {
         > ./myscript.js
 
         "#
-    }, "");
+        },
+        "",
+    );
 
     c.bench_function("parse http request", |b| {
         b.iter(|| {
