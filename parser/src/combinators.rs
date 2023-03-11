@@ -1,3 +1,4 @@
+use crate::parsers::{IResult, Span};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_until1, take_while};
 use nom::character::complete::char;
@@ -5,7 +6,6 @@ use nom::character::is_alphanumeric;
 use nom::combinator::{eof, opt};
 use nom::multi::many0;
 use nom::sequence::tuple;
-use crate::parsers::{IResult, Span};
 
 #[cfg(all(not(target_os = "windows")))]
 pub(crate) const NEW_LINE: &str = "\n";
@@ -15,7 +15,6 @@ const NEW_LINE: &str = "\r\n";
 
 const SCRIPT_START: &str = "> ";
 const SCRIPT_END: &str = "%}";
-
 
 pub fn request_title(i: Span) -> IResult<Span> {
     let (i, optional) = opt(tuple((
@@ -52,7 +51,7 @@ pub fn inline_script(i: Span) -> IResult<Span> {
         tag("{%"),
         take_until1(SCRIPT_END),
         tag(SCRIPT_END),
-        many0(tag(NEW_LINE))
+        many0(tag(NEW_LINE)),
     ))(i)?;
 
     Ok((i, script))

@@ -1,8 +1,8 @@
 mod ast;
 mod parsers;
 
+mod combinators;
 #[cfg(test)]
 mod tests;
-mod combinators;
 
 pub use parsers::parse_request;

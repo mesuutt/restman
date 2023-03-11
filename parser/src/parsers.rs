@@ -1,19 +1,17 @@
-
-use crate::ast::{Header, MessageBody, Method, Request, Version, ScriptHandler};
+use crate::ast::{Header, MessageBody, Method, Request, ScriptHandler, Version};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until, take_while, take_until1};
+use nom::bytes::complete::{tag, take_until1, take_while};
 
 use nom::character::complete::{line_ending, one_of};
 
 use nom::combinator::{eof, opt, rest};
 use nom::multi::{many0, many_till};
-use nom::sequence::{tuple};
+use nom::sequence::tuple;
 
 use nom_locate::LocatedSpan;
 
-use nom::error::{context};
 use crate::combinators::*;
-
+use nom::error::context;
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 
@@ -26,7 +24,6 @@ pub struct RequestLine<'a> {
     pub version: Version,
 }
 
-
 pub fn parse_request_title(i: Span) -> IResult<Option<Span>> {
     let (i, title) = context("request title", request_title)(i)?;
 
@@ -36,7 +33,6 @@ pub fn parse_request_title(i: Span) -> IResult<Option<Span>> {
 
     return Ok((i, Some(title)));
 }
-
 
 pub(crate) fn request_line(i: Span) -> IResult<RequestLine> {
     // [method required-whitespace] request-target [required-whitespace http-version]
@@ -113,7 +109,7 @@ pub(crate) fn parse_script(i: Span) -> IResult<ScriptHandler> {
         // because if script is given but has an error
         // how we know the error is relevant to parsing or because there is no script
         // TODO: maybe we can raise specific ParseErr and check it
-        |i| Ok((i, ScriptHandler::Empty))
+        |i| Ok((i, ScriptHandler::Empty)),
     ))(i)
 }
 
@@ -125,11 +121,7 @@ pub(crate) fn parse_inline_script(i: Span) -> IResult<ScriptHandler> {
 
 pub(crate) fn parse_external_script(i: Span) -> IResult<ScriptHandler> {
     // ‘>’ required-whitespace file-path
-    let (i, (_, path, _)) = tuple((
-        tag("> "),
-        take_until1(NEW_LINE),
-        many0(tag(NEW_LINE))
-    ))(i)?;
+    let (i, (_, path, _)) = tuple((tag("> "), take_until1(NEW_LINE), many0(tag(NEW_LINE))))(i)?;
 
     return Ok((i, ScriptHandler::File(path)));
 }
@@ -156,7 +148,7 @@ pub fn parse_request(i: Span) -> IResult<Request> {
 }
 
 pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {
-    let (i, (requests, _eof), ) = many_till(parse_request, eof)(i)?;
+    let (i, (requests, _eof)) = many_till(parse_request, eof)(i)?;
     Ok((i, requests))
     // we can split content at here and give each part of the span as separate
     // !peek(parse_request_title)(i).is_ok() && !peek(empty_lines)(i).is_ok()

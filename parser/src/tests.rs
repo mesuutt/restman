@@ -4,7 +4,7 @@ mod test {
     use nom_locate::LocatedSpan;
 
     use crate::parsers::*;
-    
+
     use crate::ast::{Header, MessageBody, Method, ScriptHandler, Version};
 
     #[test]
@@ -102,7 +102,10 @@ mod test {
         assert_eq!(result.version, Version::V11);
 
         assert_eq!(result.headers.len(), 2);
-        assert_eq!(result.body.get_span().unwrap().fragment(), &r#"{"foo": "bar"}"#);
+        assert_eq!(
+            result.body.get_span().unwrap().fragment(),
+            &r#"{"foo": "bar"}"#
+        );
     }
 
     #[test]
@@ -154,7 +157,6 @@ mod test {
         assert_eq!(first_req.script, ScriptHandler::File(Span::new("./foo.js")));
     }
 
-
     #[test]
     fn it_should_parse_if_input_file_ref_given_as_body() {
         let input = LocatedSpan::new("< ./input.json");
@@ -199,7 +201,7 @@ mod test {
     }
 
     #[test]
-    fn  it_should_parse_script_handle() {
+    fn it_should_parse_script_handle() {
         let (i1, _) = parse_script(LocatedSpan::new("> ./foo.js\n")).unwrap();
         let (i2, _) = parse_script(LocatedSpan::new("> {% my inline script %}\n")).unwrap();
 

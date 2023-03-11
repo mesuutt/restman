@@ -35,7 +35,7 @@ impl<'a> MessageBody<'a> {
         match self {
             MessageBody::Bytes(x) => Some(x),
             MessageBody::Empty => None,
-            MessageBody::File(x) =>  Some(x)
+            MessageBody::File(x) => Some(x),
         }
     }
 }
@@ -87,12 +87,12 @@ pub enum ScriptHandler<'a> {
 
 impl<'a> PartialEq for ScriptHandler<'a> {
     fn eq(&self, other: &Self) -> bool {
-       match (self, other) {
-           (Self::Inline(x), Self::Inline(y)) => x.fragment() == y.fragment(),
-           (Self::File(x), Self::File(y)) => x.fragment() == y.fragment(),
-           (Self::Empty, Self::Empty) => true,
-           (_, _) => false,
-       }
+        match (self, other) {
+            (Self::Inline(x), Self::Inline(y)) => x.fragment() == y.fragment(),
+            (Self::File(x), Self::File(y)) => x.fragment() == y.fragment(),
+            (Self::Empty, Self::Empty) => true,
+            (_, _) => false,
+        }
     }
 
     fn ne(&self, other: &Self) -> bool {
