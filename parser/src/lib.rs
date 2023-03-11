@@ -1,6 +1,7 @@
 mod ast;
-mod error;
 mod parsers;
+
+#[cfg(test)]
 mod tests;
 
 pub use parsers::parse_request;

@@ -7,7 +7,7 @@ pub struct Request<'a> {
     pub version: Version,
     pub headers: Vec<Header<'a>>,
     pub body: MessageBody<'a>,
-    pub title: String,
+    pub title: Option<Span<'a>>,
     pub script: ScriptHandler<'a>,
 }
 

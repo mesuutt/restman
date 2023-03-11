@@ -86,7 +86,7 @@ mod test {
     #[test]
     fn it_should_parse_a_full_featured_request() {
         let input = LocatedSpan::new(indoc! {
-            "###My request
+            "### My request
             GET /index.html HTTP/1.1
             Content-type: application/json
             Authorization: bearer token
@@ -96,7 +96,7 @@ mod test {
 
         let (_span, result) = parse_request(input).unwrap();
 
-        assert_eq!(result.title, "My request");
+        assert_eq!(*result.title.unwrap().fragment(), "My request");
         assert_eq!(result.method, Method::Get);
         assert_eq!(result.target, "/index.html".to_string());
         assert_eq!(result.version, Version::V11);
@@ -132,19 +132,28 @@ mod test {
         assert_eq!(result.body, MessageBody::Empty);
     }
 
-    // #[test]
+    #[test]
     fn multiple_request_parser_test() {
         let input = LocatedSpan::new(indoc! {
-            "## Request 1
+            "### Request 1
             GET /first.html
 
-            ###Request 2
+            {foo: bar}
+
+            > ./foo.js
+
+            ### Request 2
             GET /last.html"
         });
         let (_i, result) = parse_multiple_request(input).unwrap();
 
         assert_eq!(result.len(), 2);
+        let first_req = result.get(0).unwrap();
+        assert_eq!(*first_req.title.unwrap().fragment(), "Request 1");
+        assert_eq!(first_req.headers.len(), 0);
+        assert_eq!(first_req.script, ScriptHandler::File(Span::new("./foo.js")));
     }
+
 
     #[test]
     fn it_should_parse_if_input_file_ref_given_as_body() {
@@ -166,9 +175,9 @@ mod test {
             }"#
         });
 
-        let (i, _) = parse_request_body(input).unwrap();
+        let result = parse_request_body(input);
 
-        assert!(i.is_empty());
+        assert!(result.unwrap().0.is_empty());
     }
 
     #[test]
