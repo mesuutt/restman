@@ -40,7 +40,7 @@ mod test {
             "
         });
 
-        let (_span, header) = header_line(input).expect("header parse failed");
+        let (_span, header) = parse_header(input).expect("header parse failed");
 
         let expected = Header {
             name: LocatedSpan::new("Content-type"),
@@ -55,7 +55,7 @@ mod test {
     fn it_should_return_err_if_header_not_ends_with_new_line() {
         let input = LocatedSpan::new("Header: value");
 
-        assert!(header_line(input).is_err())
+        assert!(parse_header(input).is_err())
     }
 
     #[test]
