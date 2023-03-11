@@ -1,8 +1,8 @@
 use crate::ast::{Header, MessageBody, Method, Request, ScriptHandler, Version};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until, take_until1, take_while};
+use nom::bytes::complete::{escaped, tag, take_until, take_until1, take_while};
 
-use nom::character::complete::{line_ending, one_of};
+use nom::character::complete::{crlf, line_ending, one_of};
 
 use nom::combinator::{eof, opt, rest};
 use nom::multi::{many0, many_till};

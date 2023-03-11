@@ -36,8 +36,7 @@ mod test {
     #[test]
     fn it_should_parse_header() {
         let input = LocatedSpan::new(indoc! {
-            "Content-type: application/json
-            "
+            "Content-type: application/json"
         });
 
         let (_span, header) = parse_header(input).expect("header parse failed");
@@ -52,11 +51,22 @@ mod test {
     }
 
     #[test]
-    fn it_should_return_err_if_header_not_ends_with_new_line() {
-        let input = LocatedSpan::new("Header: value");
+    fn it_should_parse_header_with_newline() {
+        let input = LocatedSpan::new(indoc! {
+            "Content-type: application/json\n\n"
+        });
 
-        assert!(parse_header(input).is_err())
+        let (_span, header) = parse_header(input).expect("header parse failed");
+
+        let expected = Header {
+            name: LocatedSpan::new("Content-type"),
+            value: LocatedSpan::new("application/json"),
+        };
+
+        assert_eq!(header.name.fragment(), expected.name.fragment());
+        assert_eq!(header.value.fragment(), expected.value.fragment());
     }
+
 
     #[test]
     fn it_should_parse_multiple_headers() {
@@ -155,6 +165,16 @@ mod test {
         assert_eq!(*first_req.title.unwrap().fragment(), "Request 1");
         assert_eq!(first_req.headers.len(), 0);
         assert_eq!(first_req.script, ScriptHandler::File(Span::new("./foo.js")));
+        if let MessageBody::Bytes(body) = first_req.body {
+            assert_eq!(body.fragment(), &"{foo: bar}\n\n"); // TODO: parse body should return without \n\n
+        } else { assert!(false, "body not matches") }
+
+        let second_req = result.get(1).unwrap();
+        assert_eq!(*second_req.title.unwrap().fragment(), "Request 2");
+        assert_eq!(second_req.headers.len(), 0);
+        assert_eq!(second_req.body, MessageBody::Empty);
+        assert_eq!(second_req.script, ScriptHandler::Empty);
+
     }
 
     #[test]
