@@ -54,7 +54,7 @@ pub fn header(i: Span) -> IResult<(Span, Span)> {
         tag(":"),
         take_while(is_space_char),
         take_while(is_header_value_char),
-        many0(tag(NEW_LINE)),
+        tag(NEW_LINE)
     ))(i)?;
 
     Ok((i, (name, value)))

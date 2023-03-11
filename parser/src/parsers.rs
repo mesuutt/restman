@@ -5,7 +5,7 @@ use nom::bytes::complete::{escaped, is_not, tag, take_until, take_until1, take_w
 use nom::character::complete::{crlf, line_ending, newline, one_of};
 
 use nom::combinator::{eof, opt, peek, recognize, rest};
-use nom::multi::{many0, many_till};
+use nom::multi::{many0, many1, many_till};
 use nom::sequence::{pair, terminated, tuple};
 
 use nom_locate::LocatedSpan;
@@ -37,7 +37,7 @@ pub(crate) fn request_line(i: Span) -> IResult<RequestLine> {
     let (i, target) = vchar_1(i)?; // TODO: handle all valid urls, read rfc
     let (i, _) = take_while(is_space_char)(i)?;
     let (i, version) = http_version(i)?;
-    // let (i, _) = many0(tag(NEW_LINE))(i)?;
+    let (i, _) = opt(tag(NEW_LINE))(i)?;
 
     Ok((
         i,
@@ -69,7 +69,7 @@ fn http_version(i: Span) -> IResult<Version> {
 
 // parse one header
 pub(crate) fn parse_header(i: Span) -> IResult<Header> {
-    let (i, _) = many0(newline)(i)?;
+    // let (i, _) = many0(newline)(i)?; // extra newline between header is invalid
     let (i, (name, value)) = header(i)?;
     Ok((i, Header { name, value }))
 }
@@ -77,7 +77,6 @@ pub(crate) fn parse_header(i: Span) -> IResult<Header> {
 // parse multiple headers
 pub(crate) fn parse_headers(i: Span) -> IResult<Vec<Header>> {
     let (i, headers) = many0(parse_header)(i)?;
-    // let (i, _) = opt(line_ending)(i)?;
     Ok((i, headers))
 }
 
@@ -144,8 +143,11 @@ pub(crate) fn parse_external_script(i: Span) -> IResult<ScriptHandler> {
 
 pub fn parse_request(i: Span) -> IResult<Request> {
     let (i, title) = parse_request_title(i)?;
+    let (i, _) = many0(newline)(i)?;
     let (i, line) = request_line(i)?;
+    let (i, _) = opt(newline)(i)?; // allowing to only 1 newline
     let (i, headers) = parse_headers(i)?;
+    let (i, _) = many0(newline)(i)?;
     let (i, body) = parse_request_body(i)?;
     let (i, script) = parse_script(i)?;
     let (i, _) = many0(newline)(i)?;

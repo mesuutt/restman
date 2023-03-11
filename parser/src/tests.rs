@@ -35,8 +35,8 @@ mod test {
 
     #[test]
     fn it_should_parse_header() {
-        let input = LocatedSpan::new_extra(indoc!{
-            "Content-type: application/json"
+        let input = LocatedSpan::new_extra(indoc! {
+            "Content-type: application/json\n"
         }, "");
 
         let (_span, header) = parse_header(input).expect("header parse failed");
@@ -48,6 +48,16 @@ mod test {
 
         assert_eq!(header.name.fragment(), expected.name.fragment());
         assert_eq!(header.value.fragment(), expected.value.fragment());
+    }
+
+    #[test]
+    fn it_should_not_parse_if_there_is_no_newline_at_end_of_the_header() {
+        let input = LocatedSpan::new_extra(indoc! {
+            "Content-type: application/json"
+        }, "");
+
+        let result = parse_header(input);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -208,7 +218,6 @@ mod test {
         let (i, result) = parse_request(input).unwrap();
         assert_eq!(i.fragment(), &"");
     }
-
 
 
     #[test]
