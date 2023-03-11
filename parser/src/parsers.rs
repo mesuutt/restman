@@ -1,12 +1,12 @@
 use crate::ast::{Header, MessageBody, Method, Request, ScriptHandler, Version};
 use nom::branch::alt;
-use nom::bytes::complete::{escaped, is_not, tag, take_until, take_until1, take_while};
+use nom::bytes::complete::{tag, take_until, take_while};
 
-use nom::character::complete::{crlf, line_ending, newline, one_of};
+use nom::character::complete::{newline, one_of};
 
-use nom::combinator::{eof, opt, peek, recognize, rest};
-use nom::multi::{many0, many1, many_till};
-use nom::sequence::{pair, terminated, tuple};
+use nom::combinator::{eof, opt, peek, rest};
+use nom::multi::{many0, many_till};
+use nom::sequence::{tuple};
 
 use nom_locate::LocatedSpan;
 

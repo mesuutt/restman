@@ -5,7 +5,7 @@ use parser;
 
 fn main() {
     let filename = env::args().nth(1).unwrap();
-    let mut file = File::open(&filename).map_err(|e| format!("file not found: '{}'", filename)).unwrap();
+    let mut file = File::open(&filename).map_err(|_e| format!("file not found: '{}'", filename)).unwrap();
 
     let mut source = String::new();
 

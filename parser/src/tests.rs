@@ -215,7 +215,7 @@ mod test {
 
             "
         }, "");
-        let (i, result) = parse_request(input).unwrap();
+        let (i, _result) = parse_request(input).unwrap();
         assert_eq!(i.fragment(), &"");
     }
 
@@ -265,8 +265,8 @@ mod test {
 
     #[test]
     fn it_should_parse_script_handle() {
-        let (i1, s1) = parse_script(Span::new_extra("> ./foo.js\n", "")).unwrap();
-        let (i2, s2) = parse_script(Span::new_extra("> {% my inline script %}\n", "")).unwrap();
+        let (_i1, s1) = parse_script(Span::new_extra("> ./foo.js\n", "")).unwrap();
+        let (_i2, s2) = parse_script(Span::new_extra("> {% my inline script %}\n", "")).unwrap();
 
         assert_eq!(s1, ScriptHandler::File(Span::new_extra("./foo.js", "")));
         assert_eq!(s2, ScriptHandler::Inline(Span::new_extra(" my inline script ", "")));
