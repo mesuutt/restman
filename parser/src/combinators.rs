@@ -17,25 +17,15 @@ const SCRIPT_START: &str = "> ";
 const SCRIPT_END: &str = "%}";
 
 pub fn request_title(i: Span) -> IResult<Span> {
-    let (i, optional) = opt(tuple((
+    let (i, (_, _, _, title, _)) = tuple((
         many0(tag(NEW_LINE)),
         tag("###"),
-        opt(tag(" ")),
+        many0(tag(" ")),
         take_until(NEW_LINE),
         tag(NEW_LINE),
-    )))(i)?;
-
-    if optional.is_none() {
-        return Ok((i, Span::new("")));
-    }
-
-    let (_, _, _, title, _) = optional.unwrap();
+    ))(i)?;
 
     return Ok((i, title));
-}
-
-pub fn script_start(i: Span) -> IResult<Span> {
-    tag(SCRIPT_START)(i)
 }
 
 pub fn until_new_request_title(i: Span) -> IResult<Span> {

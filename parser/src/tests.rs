@@ -9,11 +9,11 @@ mod test {
 
     #[test]
     fn it_should_parse_request_line_with_version() {
-        let input = LocatedSpan::new("GET /index.html HTTP/1.1");
+        let input = LocatedSpan::new_extra("GET /index.html HTTP/1.1", "");
         let result = request_line(input);
         let expected = RequestLine {
-            method: LocatedSpan::new("GET"),
-            target: LocatedSpan::new("/index.html"),
+            method: LocatedSpan::new_extra("GET", ""),
+            target: LocatedSpan::new_extra("/index.html", ""),
             version: Version::V11,
         };
 
@@ -27,7 +27,7 @@ mod test {
 
     #[test]
     fn it_should_parse_request_line_even_if_version_not_given() {
-        let input = LocatedSpan::new("GET /index.html");
+        let input = LocatedSpan::new_extra("GET /index.html", "");
         let (_, line) = request_line(input).unwrap();
 
         assert_eq!(line.version, Version::V11);
@@ -35,15 +35,15 @@ mod test {
 
     #[test]
     fn it_should_parse_header() {
-        let input = LocatedSpan::new(indoc! {
+        let input = LocatedSpan::new_extra(indoc!{
             "Content-type: application/json"
-        });
+        }, "");
 
         let (_span, header) = parse_header(input).expect("header parse failed");
 
         let expected = Header {
-            name: LocatedSpan::new("Content-type"),
-            value: LocatedSpan::new("application/json"),
+            name: LocatedSpan::new_extra("Content-type", ""),
+            value: LocatedSpan::new_extra("application/json", ""),
         };
 
         assert_eq!(header.name.fragment(), expected.name.fragment());
@@ -52,15 +52,15 @@ mod test {
 
     #[test]
     fn it_should_parse_header_with_newline() {
-        let input = LocatedSpan::new(indoc! {
+        let input = LocatedSpan::new_extra(indoc! {
             "Content-type: application/json\n\n"
-        });
+        }, "");
 
         let (_span, header) = parse_header(input).expect("header parse failed");
 
         let expected = Header {
-            name: LocatedSpan::new("Content-type"),
-            value: LocatedSpan::new("application/json"),
+            name: LocatedSpan::new_extra("Content-type", ""),
+            value: LocatedSpan::new_extra("application/json", ""),
         };
 
         assert_eq!(header.name.fragment(), expected.name.fragment());
@@ -70,21 +70,21 @@ mod test {
 
     #[test]
     fn it_should_parse_multiple_headers() {
-        let input = LocatedSpan::new(indoc! {
+        let input = LocatedSpan::new_extra(indoc! {
             "Content-type: application/json
             Authorization: bearer token
-        "});
+        "}, "");
 
         let (span, headers) = parse_headers(input).expect("header parse failed");
 
         let expected1 = Header {
-            name: LocatedSpan::new("Content-type"),
-            value: LocatedSpan::new("application/json"),
+            name: LocatedSpan::new_extra("Content-type", ""),
+            value: LocatedSpan::new_extra("application/json", ""),
         };
 
         let expected2 = Header {
-            name: LocatedSpan::new("Authorization"),
-            value: LocatedSpan::new("bearer token"),
+            name: LocatedSpan::new_extra("Authorization", ""),
+            value: LocatedSpan::new_extra("bearer token", ""),
         };
 
         assert!(span.is_empty());
@@ -95,14 +95,14 @@ mod test {
 
     #[test]
     fn it_should_parse_a_full_featured_request() {
-        let input = LocatedSpan::new(indoc! {
+        let input = LocatedSpan::new_extra(indoc! {
             "### My request
             GET /index.html HTTP/1.1
             Content-type: application/json
             Authorization: bearer token
 
             {\"foo\": \"bar\"}"
-        });
+        }, "");
 
         let (_span, result) = parse_request(input).unwrap();
 
@@ -129,7 +129,7 @@ mod test {
             {body}",
             body = body
         };
-        let input = LocatedSpan::new(request_input.as_str());
+        let input = LocatedSpan::new_extra(request_input.as_str(), "");
 
         let (span, result) = parse_request(input).unwrap();
 
@@ -139,7 +139,7 @@ mod test {
 
     #[test]
     fn it_should_parse_request_without_body() {
-        let input = LocatedSpan::new("GET /index.html");
+        let input = LocatedSpan::new_extra("GET /index.html", "");
         let (_, result) = parse_request(input).unwrap();
 
         assert_eq!(result.body, MessageBody::Empty);
@@ -147,7 +147,7 @@ mod test {
 
     #[test]
     fn multiple_request_parser_test() {
-        let input = LocatedSpan::new(indoc! {
+        let input = LocatedSpan::new_extra(indoc! {
             "### Request 1
             GET /first.html
 
@@ -157,14 +157,14 @@ mod test {
 
             ### Request 2
             GET /last.html"
-        });
+        }, "");
         let (_i, result) = parse_multiple_request(input).unwrap();
 
         assert_eq!(result.len(), 2);
         let first_req = result.get(0).unwrap();
         assert_eq!(*first_req.title.unwrap().fragment(), "Request 1");
         assert_eq!(first_req.headers.len(), 0);
-        assert_eq!(first_req.script, ScriptHandler::File(Span::new("./foo.js")));
+        assert_eq!(first_req.script, ScriptHandler::File(Span::new_extra("./foo.js", "")));
         if let MessageBody::Bytes(body) = first_req.body {
             assert_eq!(body.fragment(), &"{foo: bar}\n\n"); // TODO: parse body should return without \n\n
         } else { assert!(false, "body not matches") }
@@ -178,7 +178,7 @@ mod test {
 
     #[test]
     fn should_parse_body_until_next_request_title() {
-        let input = LocatedSpan::new(indoc! {
+        let input = LocatedSpan::new_extra(indoc! {
             "### Request 1
             GET /first.html
 
@@ -186,7 +186,7 @@ mod test {
 
             ### Request 2
             GET /last.html"
-        });
+        }, "");
         let (_i, result) = parse_multiple_request(input).unwrap();
 
         assert_eq!(result.len(), 2);
@@ -198,7 +198,7 @@ mod test {
 
     #[test]
     fn it_should_parse_if_input_file_ref_given_as_body() {
-        let input = LocatedSpan::new("< ./input.json");
+        let input = LocatedSpan::new_extra("< ./input.json", "");
 
         let (i, body) = parse_input_file_ref(input).unwrap();
 
@@ -208,13 +208,13 @@ mod test {
 
     #[test]
     fn it_should_parse_request_body_with_multiple_lines() {
-        let input = LocatedSpan::new(indoc! {r#"{
+        let input = LocatedSpan::new_extra(indoc! {r#"{
                 1: 1,
 
                 "foo": "bar"
 
             }"#
-        });
+        }, "");
 
         let result = parse_request_body(input);
 
@@ -223,28 +223,28 @@ mod test {
 
     #[test]
     fn it_should_parse_inline_script_handler() {
-        let input = LocatedSpan::new("> {% my script %}\n");
+        let input = LocatedSpan::new_extra("> {% my script %}\n", "");
         let (i, h) = parse_inline_script(input).unwrap();
 
         assert!(i.is_empty());
-        assert_eq!(h, ScriptHandler::Inline(LocatedSpan::new(" my script ")));
+        assert_eq!(h, ScriptHandler::Inline(LocatedSpan::new_extra(" my script ", "")));
     }
 
     #[test]
     fn it_should_parse_external_script_handler() {
-        let input = LocatedSpan::new("> ./my-script.js");
+        let input = LocatedSpan::new_extra("> ./my-script.js", "");
         let (i, h) = parse_external_script(input).unwrap();
 
         assert!(i.is_empty());
-        assert_eq!(h, ScriptHandler::File(LocatedSpan::new("./my-script.js")));
+        assert_eq!(h, ScriptHandler::File(LocatedSpan::new_extra("./my-script.js", "")));
     }
 
     #[test]
     fn it_should_parse_script_handle() {
-        let (i1, s1) = parse_script(LocatedSpan::new("> ./foo.js\n")).unwrap();
-        let (i2, s2) = parse_script(LocatedSpan::new("> {% my inline script %}\n")).unwrap();
+        let (i1, s1) = parse_script(Span::new_extra("> ./foo.js\n", "")).unwrap();
+        let (i2, s2) = parse_script(Span::new_extra("> {% my inline script %}\n", "")).unwrap();
 
-        assert_eq!(s1, ScriptHandler::File(Span::new("./foo.js")));
-        assert_eq!(s2, ScriptHandler::Inline(Span::new(" my inline script ")));
+        assert_eq!(s1, ScriptHandler::File(Span::new_extra("./foo.js", "")));
+        assert_eq!(s2, ScriptHandler::Inline(Span::new_extra(" my inline script ", "")));
     }
 }

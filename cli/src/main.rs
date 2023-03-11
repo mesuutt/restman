@@ -11,7 +11,7 @@ fn main() {
 
     file.read_to_string(&mut source).map_err(|_e| "error reading file").unwrap();
 
-    let requests = parser::parse(&source);
+    let requests = parser::parse(filename.as_str(), &source);
     for i in requests.iter() {
         println!("##############################");
         println!("title: {:?}", i.title);

@@ -13,7 +13,7 @@ use nom_locate::LocatedSpan;
 use crate::combinators::*;
 use nom::error::context;
 
-pub type Span<'a> = LocatedSpan<&'a str>;
+pub type Span<'a> = LocatedSpan<&'a str, &'a str>;
 
 pub type IResult<'a, O> = nom::IResult<Span<'a>, O>;
 
@@ -25,13 +25,9 @@ pub struct RequestLine<'a> {
 }
 
 pub fn parse_request_title(i: Span) -> IResult<Option<Span>> {
-    let (i, title) = context("request title", request_title)(i)?;
+    let (i, title) = context("request title", opt(request_title))(i)?;
 
-    if title.is_empty() {
-        return Ok((i, None));
-    }
-
-    return Ok((i, Some(title)));
+    return Ok((i, title));
 }
 
 pub(crate) fn request_line(i: Span) -> IResult<RequestLine> {
@@ -94,9 +90,9 @@ pub(crate) fn parse_request_body(i: Span) -> IResult<MessageBody> {
     // alt runs first parser until get error.
     // if first parser not return error it returns parsed from first parser.
     // I could not find good way to consume until one of [script start | next title | eof]
-
-    let mut body = Span::new("");
-    let mut j = Span::new("");
+    // TODO: refactor this logic
+    let mut body = Span::new_extra("", "");
+    let mut j = Span::new_extra("", "");
 
     if until_script.fragment().len() > until_title.fragment().len() {
         (j, body) = alt((until_new_request_title, rest))(i)?;
@@ -168,15 +164,15 @@ pub fn parse_request(i: Span) -> IResult<Request> {
 }
 
 pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {
-    let (i, (requests, _eof)) = many_till(parse_request, eof)(i)?;
+    let (i, (requests, _)) = many_till(parse_request, eof)(i)?;
     Ok((i, requests))
     // we can split content at here and give each part of the span as separate
     // !peek(parse_request_title)(i).is_ok() && !peek(empty_lines)(i).is_ok()
 }
 
-pub fn parse(i: &str) -> Vec<Request> {
+pub fn parse<'a>(filename: &'a str, i: &'a str) -> Vec<Request<'a>> {
     // TODO: error handling
-    let (_, requests) = parse_multiple_request(Span::new(i)).map_err(|e| format!("request parse failed: {:?}", e)).unwrap();
+    let (_, requests) = parse_multiple_request(Span::new_extra(i, filename)).map_err(|e| format!("request parse failed: {:?}", e)).unwrap();
 
     requests
 }
