@@ -1,17 +1,17 @@
-use std::str::SplitN;
+
 use crate::ast::{Header, MessageBody, Method, Request, Version, ScriptHandler};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until, take_while, take_until1, is_not, take_while1};
-use nom::bytes::streaming::take_till;
-use nom::character::complete::{char, line_ending, one_of, multispace0, newline, none_of};
-use nom::character::{is_alphanumeric};
-use nom::combinator::{cond, eof, map, opt, rest};
-use nom::multi::{many0, many1, many_till, separated_list0};
-use nom::sequence::{terminated, tuple, preceded, delimited, pair};
-use nom::Err::{Error, Failure};
+use nom::bytes::complete::{tag, take_until, take_while, take_until1};
+
+use nom::character::complete::{line_ending, one_of};
+
+use nom::combinator::{eof, opt, rest};
+use nom::multi::{many0, many_till};
+use nom::sequence::{tuple};
+
 use nom_locate::LocatedSpan;
-use nom::Err;
-use nom::error::{context, ErrorKind, ParseError};
+
+use nom::error::{context};
 use crate::combinators::*;
 
 
@@ -28,20 +28,11 @@ pub struct RequestLine<'a> {
 
 
 pub fn parse_request_title(i: Span) -> IResult<Option<Span>> {
-    let (i, optional) = context(
-        "request title",
-        opt(tuple((
-            tag("###"),
-            opt(tag(" ")),
-            take_until(NEW_LINE),
-            tag(NEW_LINE),
-        ))))(i)?;
+    let (i, title) = context("request title", request_title)(i)?;
 
-    if optional.is_none() {
+    if title.is_empty() {
         return Ok((i, None));
     }
-
-    let (_, _, title, _) = optional.unwrap();
 
     return Ok((i, Some(title)));
 }

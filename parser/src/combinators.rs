@@ -2,7 +2,7 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_until1, take_while};
 use nom::character::complete::char;
 use nom::character::is_alphanumeric;
-use nom::combinator::eof;
+use nom::combinator::{eof, opt};
 use nom::multi::many0;
 use nom::sequence::tuple;
 use crate::parsers::{IResult, Span};
@@ -18,12 +18,20 @@ const SCRIPT_END: &str = "%}";
 
 
 pub fn request_title(i: Span) -> IResult<Span> {
-    let (j, v) = tuple((
+    let (i, optional) = opt(tuple((
         tag("###"),
-        many0(char(' ')),
-    ))(i)?;
+        opt(tag(" ")),
+        take_until(NEW_LINE),
+        tag(NEW_LINE),
+    )))(i)?;
 
-    Ok((i, j))
+    if optional.is_none() {
+        return Ok((i, Span::new("")));
+    }
+
+    let (_, _, title, _) = optional.unwrap();
+
+    return Ok((i, title));
 }
 
 pub fn script_start(i: Span) -> IResult<Span> {

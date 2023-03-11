@@ -96,6 +96,6 @@ impl<'a> PartialEq for ScriptHandler<'a> {
     }
 
     fn ne(&self, other: &Self) -> bool {
-        todo!()
+        !self.eq(other)
     }
 }
