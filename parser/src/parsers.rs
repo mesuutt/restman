@@ -10,7 +10,7 @@ use nom::sequence::tuple;
 
 use nom_locate::LocatedSpan;
 
-use crate::combinators::*;
+use crate::lexer::*;
 use nom::error::context;
 
 pub type Span<'a> = LocatedSpan<&'a str, &'a str>;
