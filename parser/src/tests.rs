@@ -196,9 +196,11 @@ mod test {
     }
 
     #[test]
-    fn it_should_parse_request_if_content_ends_with_newlines() {
+    fn it_should_parse_request_if_request_starts_or_ends_with_newlines() {
         let input = LocatedSpan::new_extra(indoc! {
-            "### Request 1
+            "
+
+            ### Request 1
             GET /last.html
 
             "
