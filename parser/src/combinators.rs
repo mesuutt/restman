@@ -1,11 +1,11 @@
 use crate::parsers::{IResult, Span};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until, take_until1, take_while};
-use nom::character::complete::char;
-use nom::character::is_alphanumeric;
-use nom::combinator::{eof, opt};
-use nom::multi::many0;
-use nom::sequence::tuple;
+use nom::bytes::complete::{is_not, tag, take_till, take_until, take_until1, take_while};
+use nom::character::complete::{char, crlf, newline};
+use nom::character::{is_alphanumeric, is_space};
+use nom::combinator::{eof, opt, peek, recognize};
+use nom::multi::{many0, many0_count};
+use nom::sequence::{pair, tuple};
 
 #[cfg(all(not(target_os = "windows")))]
 pub(crate) const NEW_LINE: &str = "\n";
@@ -111,3 +111,5 @@ pub fn is_space_char(x: char) -> bool {
 pub fn sp(i: Span) -> IResult<char> {
     char(' ')(i)
 }
+
+

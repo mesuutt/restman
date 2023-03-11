@@ -174,8 +174,27 @@ mod test {
         assert_eq!(second_req.headers.len(), 0);
         assert_eq!(second_req.body, MessageBody::Empty);
         assert_eq!(second_req.script, ScriptHandler::Empty);
-
     }
+
+    #[test]
+    fn should_parse_body_until_next_request_title() {
+        let input = LocatedSpan::new(indoc! {
+            "### Request 1
+            GET /first.html
+
+            {foo: bar}
+
+            ### Request 2
+            GET /last.html"
+        });
+        let (_i, result) = parse_multiple_request(input).unwrap();
+
+        assert_eq!(result.len(), 2);
+        if let MessageBody::Bytes(body) = result.get(0).unwrap().body {
+            assert_eq!(body.fragment(), &"{foo: bar}\n\n");
+        } else { assert!(false, "body not matches") }
+    }
+
 
     #[test]
     fn it_should_parse_if_input_file_ref_given_as_body() {

@@ -1,12 +1,12 @@
 use crate::ast::{Header, MessageBody, Method, Request, ScriptHandler, Version};
 use nom::branch::alt;
-use nom::bytes::complete::{escaped, tag, take_until, take_until1, take_while};
+use nom::bytes::complete::{escaped, is_not, tag, take_until, take_until1, take_while};
 
-use nom::character::complete::{crlf, line_ending, one_of};
+use nom::character::complete::{crlf, line_ending, newline, one_of};
 
-use nom::combinator::{eof, opt, rest};
+use nom::combinator::{eof, opt, peek, recognize, rest};
 use nom::multi::{many0, many_till};
-use nom::sequence::tuple;
+use nom::sequence::{pair, terminated, tuple};
 
 use nom_locate::LocatedSpan;
 
@@ -41,7 +41,7 @@ pub(crate) fn request_line(i: Span) -> IResult<RequestLine> {
     let (i, target) = vchar_1(i)?; // TODO: handle all valid urls, read rfc
     let (i, _) = take_while(is_space_char)(i)?;
     let (i, version) = http_version(i)?;
-    let (i, _) = many0(tag(NEW_LINE))(i)?;
+    // let (i, _) = many0(tag(NEW_LINE))(i)?;
 
     Ok((
         i,
@@ -73,6 +73,7 @@ fn http_version(i: Span) -> IResult<Version> {
 
 // parse one header
 pub(crate) fn parse_header(i: Span) -> IResult<Header> {
+    let (i, _) = many0(newline)(i)?;
     let (i, (name, value)) = header(i)?;
     Ok((i, Header { name, value }))
 }
@@ -80,17 +81,36 @@ pub(crate) fn parse_header(i: Span) -> IResult<Header> {
 // parse multiple headers
 pub(crate) fn parse_headers(i: Span) -> IResult<Vec<Header>> {
     let (i, headers) = many0(parse_header)(i)?;
-    let (i, _) = opt(line_ending)(i)?;
+    // let (i, _) = opt(line_ending)(i)?;
     Ok((i, headers))
 }
 
 // consume content until script, new request or eof
 pub(crate) fn parse_request_body(i: Span) -> IResult<MessageBody> {
-    let (i, body) = alt((until_script_start, until_new_request_title, rest))(i)?;
-    if body.is_empty() {
-        Ok((i, MessageBody::Empty))
+    let (_, until_script) = peek(alt((take_until("> "), rest)))(i)?;
+    let (_, until_title) = peek(alt((take_until("###"), rest)))(i)?;
+
+    // We should consume until to [script start | new title | eof].
+    // alt runs first parser until get error.
+    // if first parser not return error it returns parsed from first parser.
+    // I could not find good way to consume until one of [script start | next title | eof]
+
+    let mut body = Span::new("");
+    let mut j = Span::new("");
+
+    if until_script.fragment().len() > until_title.fragment().len() {
+        (j, body) = alt((until_new_request_title, rest))(i)?;
     } else {
-        Ok((i, MessageBody::Bytes(body)))
+        (j, body) = alt((until_script_start, rest))(i)?;
+    }
+
+    // clean new lines from beginning of body
+    let (body, _) = many0(newline)(body)?;
+
+    if body.is_empty() {
+        Ok((j, MessageBody::Empty))
+    } else {
+        Ok((j, MessageBody::Bytes(body)))
     }
 }
 
@@ -121,7 +141,7 @@ pub(crate) fn parse_inline_script(i: Span) -> IResult<ScriptHandler> {
 
 pub(crate) fn parse_external_script(i: Span) -> IResult<ScriptHandler> {
     // ‘>’ required-whitespace file-path
-    let (i,  (_, path)) = tuple((tag("> "), alt((take_until(NEW_LINE), rest))))(i)?;
+    let (i, (_, path)) = tuple((tag("> "), alt((take_until(NEW_LINE), rest))))(i)?;
 
     return Ok((i, ScriptHandler::File(path)));
 }
