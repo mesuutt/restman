@@ -28,9 +28,9 @@ mod test {
     #[test]
     fn it_should_parse_request_line_even_if_version_not_given() {
         let input = LocatedSpan::new("GET /index.html");
-        let (_, l) = request_line(input).unwrap();
+        let (_, line) = request_line(input).unwrap();
 
-        assert_eq!(l.version, Version::V11);
+        assert_eq!(line.version, Version::V11);
     }
 
     #[test]

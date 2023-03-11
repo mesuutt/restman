@@ -153,3 +153,10 @@ pub fn parse_multiple_request(i: Span) -> IResult<Vec<Request>> {
     // we can split content at here and give each part of the span as separate
     // !peek(parse_request_title)(i).is_ok() && !peek(empty_lines)(i).is_ok()
 }
+
+pub fn parse(i: &str) -> Vec<Request> {
+    // TODO: error handling
+    let (_, requests) = parse_multiple_request(Span::new(i)).map_err(|e| format!("request parse failed: {:?}", e)).unwrap();
+
+    requests
+}

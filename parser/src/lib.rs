@@ -6,3 +6,4 @@ mod combinators;
 mod tests;
 
 pub use parsers::parse_request;
+pub use parsers::parse;
