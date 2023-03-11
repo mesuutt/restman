@@ -131,13 +131,13 @@ fn until_script_start(i: Span) -> IResult<Span> {
     take_until(SCRIPT_START)(i)
 }
 
-// consume content until EOF or script start
+// consume content until script, new request or eof
 pub(crate) fn parse_request_body(i: Span) -> IResult<MessageBody> {
     let (i, body) = alt((until_script_start, until_new_request_title, rest))(i)?;
     if body.is_empty() {
         Ok((i, MessageBody::Empty))
     } else {
-        return Ok((i, MessageBody::Bytes(body)));
+        Ok((i, MessageBody::Bytes(body)))
     }
 }
 
